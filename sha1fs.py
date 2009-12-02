@@ -30,8 +30,8 @@ import fuse
 from fuse import Fuse
 
 from pysqlite2 import dbapi2 as sqlite
-
 import logging
+import hashlib
 
 LOG_FILENAME = "LOG"
 logging.basicConfig(filename=LOG_FILENAME,level=logging.INFO,)
@@ -53,6 +53,15 @@ def flag2mode(flags):
 
 	return m
 
+def sumfile(fobj):
+	'''Returns a SHA1 hash for an object with read() method.'''
+	m = hashlib.sha1()
+	while True:
+		d = fobj.read(1024)
+		if not d:
+			break
+		m.update(d)
+	return m.hexdigest()
 
 class Sha1FS(Fuse):
 	def __init__(self, *args, **kw):
@@ -175,14 +184,14 @@ class Sha1FS(Fuse):
 
 	def chown(self, path, user, group):
 		"""Changes the owner of a file or directory."""
-		logging.info("chown: %s (uid %s, gid %s)" % (path, uid, gid))
+		logging.info("chown: %s (uid %s, gid %s)" % (path, user, group))
 		os.chown("." + path, user, group)
 
 	def truncate(self, path, len):
 		with file("." + path, "a"):
 			f.truncate(len)
 
-	def mknod(self, path, mode, dev):
+	def mknod(self, path, mode, rdev):
 		"""
 		Creates a non-directory file (or a device node).
 		mode: Unix file mode flags for the file being created.
@@ -209,8 +218,8 @@ class Sha1FS(Fuse):
 		#   new files and directories, because they should be owned by this
 		#   user/group.
 		logging.info("mknod: %s (mode %s, rdev %s)" % (path, oct(mode), rdev))
-		os.mknod("." + path, mode, dev)
-		#connection = sqlite.connect(database)	
+		os.mknod("." + path, mode, rdev)
+		#connection = sqlite.connect(database)
 		#cursor = connection.cursor()
 		#cursor.execute("""insert into files(path,chksum) values('1','1');""")
 		#cursor.close()
@@ -249,7 +258,7 @@ class Sha1FS(Fuse):
 	def access(self, path, mode):
 		"""
 		Checks permissions for accessing a file or directory.
-		flags: As described in man 2 access (Linux Programmer's Manual).
+		mode: As described in man 2 access (Linux Programmer's Manual).
 				Either os.F_OK (test for existence of file), or ORing of
 				os.R_OK, os.W_OK, os.X_OK (test if file is readable, writable and
 				executable, respectively. Must pass all tests).
@@ -257,7 +266,7 @@ class Sha1FS(Fuse):
 		May not always be called. For example, when opening a file, open may
 		be called and access avoided.
 		"""
-		logging.info("access: %s (flags %s)" % (path, oct(flags)))
+		logging.info("access: %s (flags %s)" % (path, oct(mode)))
 		if not os.access("." + path, mode):
 			return -EACCES
 
@@ -328,6 +337,7 @@ class Sha1FS(Fuse):
 	class Sha1File(object):
 		def __init__(self, path, flags, *mode):
 			self.file = os.fdopen(os.open("." + path, flags, *mode), flag2mode(flags))
+			#logging.info("%s: %s" % (path, sumfile(self.file)))
 			self.fd = self.file.fileno()
 			self.path = "." + path
 
@@ -348,7 +358,7 @@ class Sha1FS(Fuse):
 			available (and it is a non-blocking read), return -errno.EAGAIN.
 			If it is a blocking read, just block until ready.
 			"""
-			logging.info("read: %s (size %s, offset %s)" % (self.path, length, offset))
+			logging.info("read: %s (length %s, offset %s)" % (self.path, length, offset))
 			self.file.seek(offset)
 			return self.file.read(length)
 
