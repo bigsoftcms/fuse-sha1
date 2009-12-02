@@ -28,6 +28,12 @@ except ImportError:
 import fuse
 from fuse import Fuse
 
+from pysqlite2 import dbapi2 as sqlite
+
+import logging
+
+LOG_FILENAME = "LOG"
+logging.basicConfig(filename=LOG_FILENAME,level=logging.INFO,)
 
 if not hasattr(fuse, '__version__'):
 	raise RuntimeError, \
@@ -109,6 +115,14 @@ class Sha1FS(Fuse):
 
 	def mknod(self, path, mode, dev):
 		os.mknod("." + path, mode, dev)
+		logging.info("mknod: %s (mode %s, rdev %s)" % (path, oct(mode), rdev))
+		connection = sqlite.connect(database)	
+		cursor = connection.cursor()
+		cursor.execute("""insert into files(path,chksum) values('1','1');""")
+		cursor.close()
+
+		connection.commit
+		connection.close()
 
 	def mkdir(self, path, mode):
 		os.mkdir("." + path, mode)
@@ -175,6 +189,7 @@ class Sha1FS(Fuse):
 		def __init__(self, path, flags, *mode):
 			self.file = os.fdopen(os.open("." + path, flags, *mode), flag2mode(flags))
 			self.fd = self.file.fileno()
+			self.path = "." + path
 
 		def read(self, length, offset):
 			self.file.seek(offset)
@@ -187,6 +202,7 @@ class Sha1FS(Fuse):
 
 		def release(self, flags):
 			self.file.close()
+			logging.info("release %s" % self.path)
 
 		def _fflush(self):
 			if 'w' in self.file.mode or 'a' in self.file.mode:
@@ -269,13 +285,27 @@ Userspace SHA1 checksum FS: mirror the filesystem tree, adding and updating file
 	server.parse(values=server, errex=1)
 	opts, args = server.cmdline
 	
-	if opts.database == None:
+	database = opts.database
+	
+	if database == None:
 		server.parser.print_help()
 		# how do I make this an arg?
 		print "Error: Missing SQLite database argument."
 		sys.exit()
 		
 	# init the database if it does not exist
+	dbExists = os.path.exists(database)
+	
+	connection = sqlite.connect(database)	
+	if not dbExists:
+		cursor = connection.cursor()
+		cursor.execute("""create table if not exists files(
+path varchar not null unique,
+chksum varchar not null);""")
+		cursor.close()
+
+		connection.commit
+	connection.close()
 	#with file(opts.database, 'a'):
 	#	os.utime(opts.database, None)
 
