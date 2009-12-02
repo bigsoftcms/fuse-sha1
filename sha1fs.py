@@ -104,7 +104,7 @@ class Sha1FS(Fuse):
 				cursor.close
 				connection.rollback
 		finally:
-			if !(connection is None): connection.close()
+			if (connection is not None): connection.close()
 
 	def getattr(self, path):
 		"""
