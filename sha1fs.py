@@ -88,6 +88,24 @@ class Sha1FS(Fuse):
 #            time.sleep(120)
 #            print "mythread: ticking"
 
+	def execSql(self, sql):
+		connection = None
+		try:
+			connection = sqlite.connect(self.opts.database)
+			cursor = None
+			try:
+				cursor = connection.cursor()
+				cursor.execute(sql)
+				cursor.close()
+
+				connection.commit
+			except:
+				logger.error("Unable to exec %s" % sql)
+				cursor.close
+				connection.rollback
+		finally:
+			if !(connection is None): connection.close()
+
 	def getattr(self, path):
 		"""
 		Retrieves information about a file (the "stat" of a file).
@@ -334,6 +352,9 @@ class Sha1FS(Fuse):
 		os.chdir(self.root)
 		logging.info("Filesystem %s mounted" % self.root)
 
+######################################
+######################################
+
 	class Sha1File(object):
 		def __init__(self, path, flags, *mode):
 			self.file = os.fdopen(os.open("." + path, flags, *mode), flag2mode(flags))
@@ -382,12 +403,12 @@ class Sha1FS(Fuse):
 			self.file.write(buf)
 			return len(buf)
 
-		def release(self, flags):
+		def release(self, mode):
 			"""
 			Closes an open file. Allows filesystem to clean up.
-			flags: The same flags the file was opened with (see open).
+			mode: The same flags the file was opened with (see open).
 			"""
-			logging.info("release: %s (flags %s)" % (self.path, oct(flags)))
+			logging.info("release: %s (flags %s)" % (self.path, oct(mode)))
 			self.file.close()
 
 		def _fflush(self):
