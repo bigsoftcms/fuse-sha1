@@ -110,7 +110,7 @@ class Sha1FS(Fuse):
 		try:
 			if not sql.endswith(";"): sql = sql + ";"
 			opts, args = self.cmdline
-			#logging.info("Running SQL %s for database %s" % (sql, opts.database))
+			logging.info("Running SQL %s for database %s" % (sql, opts.database))
 			connection = sqlite.connect(opts.database)
 			cursor = None
 			try:
@@ -170,6 +170,7 @@ class Sha1FS(Fuse):
 		with ewrap("unlink"):
 			logging.info("unlink: %s" % path)
 			os.unlink("." + path)
+			self.execSql("delete from files where path = '%s'" % path)
 
 	def rmdir(self, path):
 		"""Deletes a directory."""
