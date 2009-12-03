@@ -2,9 +2,12 @@
 
 # SHA1 checksum filesystem.  Calculates checksums for all files, storing them in a database given
 # by the --database argument.  Any files removed/added/modified via this script will have
-# their checksums updated.
+# their checksums updated on release and unlink.
 #
-# Enhanced version of xmp.py, with docstring comments originally taken from templatefs.py by Matt Giuca
+# Enhanced version of xmp.py (part of the FUSE Python download), with various bits and pieces 
+# copied verbatim.
+# Docstring, several other comments, and much general understanding taken from templatefs.py 
+# by Matt Giuca (https://code.launchpad.net/~mgiuca/fuse-python-docs/trunk).
 #
 # Copyright (C) 2009 Chris Bouzek  <coldfusion78@gmail.com>
 #
@@ -33,23 +36,19 @@ from pysqlite2 import dbapi2 as sqlite
 import logging
 import hashlib
 
+# xmp.py has a number of useful FUSE version checks and other assertions that we rely on here
+
 LOG_FILENAME = "LOG"
 logging.basicConfig(filename=LOG_FILENAME,level=logging.INFO,)
-
-if not hasattr(fuse, '__version__'):
-	raise RuntimeError, \
-		"your fuse-py doesn't know of fuse.__version__, probably it's too old."
-
-fuse.fuse_python_api = (0, 2)
-
-fuse.feature_assert('stateful_files', 'has_init')
 	
+# Converts OS R/W flags to filesystem R/W flags; here to support access controls
 def flag2accessflag(flags):
 	md = {os.O_RDONLY: os.R_OK, os.O_WRONLY: os.W_OK, os.O_RDWR: (os.W_OK | os.R_OK)}
 	m = md[flags & (os.O_RDONLY | os.O_WRONLY | os.O_RDWR)]
 
 	return m
 
+# Calculate an SHA1 hex digest for a file
 def sha1sum(fobj):
 	'''Returns a SHA1 hash for an object with read() method.'''
 	m = hashlib.sha1()
@@ -70,6 +69,7 @@ class ewrap:
 		if not value is None:
 			logging.info("!! Exception in %s: %s" % (self.funcName, value))
 
+# The required FUSE class
 class Sha1FS(Xmp):
 	def __init__(self, *args, **kw):
 		Xmp.__init__(self, *args, **kw)
