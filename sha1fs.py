@@ -129,7 +129,7 @@ class Sha1FS(Fuse):
 		Returns a bytestring with the contents of a symlink (its target).
 		May also return an int error code.
 		"""
-		logging.info("readlink: %s" % path)
+		logging.debug("readlink: %s" % path)
 		return os.readlink("." + path)
 
 	def readdir(self, path, offset):
@@ -144,7 +144,7 @@ class Sha1FS(Fuse):
 		request starting the listing partway through (which I clearly don't
 		yet support). Seems to always be 0 anyway.
 		"""
-		logging.info("readdir: %s (offset %s)" % (path, offset))
+		logging.debug("readdir: %s (offset %s)" % (path, offset))
 		for e in os.listdir("." + path):
 			yield fuse.Direntry(e)
 
@@ -155,7 +155,7 @@ class Sha1FS(Fuse):
 
 	def rmdir(self, path):
 		"""Deletes a directory."""
-		logging.info("rmdir: %s" % path)
+		logging.debug("rmdir: %s" % path)
 		os.rmdir("." + path)
 
 	def symlink(self, target, name):
@@ -177,7 +177,7 @@ class Sha1FS(Fuse):
 		system, it will not touch this system at all (symlinks do not depend
 		on the target system unless followed).
 		"""
-		logging.info("symlink: target %s, name: %s" % (target, name))
+		logging.debug("symlink: target %s, name: %s" % (target, name))
 		os.symlink(target, "." + name)
 
 	def rename(self, old, new):
@@ -189,7 +189,7 @@ class Sha1FS(Fuse):
 		If the operating system needs to move files across systems, it will
 		manually copy and delete the file, and this method will not be called.
 		"""
-		logging.info("rename: target %s, name: %s" % (old, new))
+		logging.debug("rename: target %s, name: %s" % (old, new))
 		os.rename("." + old, "." + new)
 
 	def link(self, target, name):
@@ -198,17 +198,17 @@ class Sha1FS(Fuse):
 		relative to the mounted file system. Hard-links across systems are not
 		supported.
 		"""
-		logging.info("link: target %s, name: %s" % (target, name))
+		logging.debug("link: target %s, name: %s" % (target, name))
 		os.link("." + target, "." + name)
 
 	def chmod(self, path, mode):
 		"""Changes the mode of a file or directory."""
-		logging.info("chmod: %s (mode %s)" % (path, oct(mode)))
+		logging.debug("chmod: %s (mode %s)" % (path, oct(mode)))
 		os.chmod("." + path, mode)
 
 	def chown(self, path, user, group):
 		"""Changes the owner of a file or directory."""
-		logging.info("chown: %s (uid %s, gid %s)" % (path, user, group))
+		logging.debug("chown: %s (uid %s, gid %s)" % (path, user, group))
 		os.chown("." + path, user, group)
 
 	def truncate(self, path, len):
@@ -241,7 +241,7 @@ class Sha1FS(Fuse):
 		#   executing the current syscall. This should be handy when creating
 		#   new files and directories, because they should be owned by this
 		#   user/group.
-		logging.info("mknod: %s (mode %s, rdev %s)" % (path, oct(mode), rdev))
+		logging.debug("mknod: %s (mode %s, rdev %s)" % (path, oct(mode), rdev))
 		os.mknod("." + path, mode, rdev)
 		#connection = sqlite.connect(database)
 		#cursor = connection.cursor()
@@ -259,7 +259,7 @@ class Sha1FS(Fuse):
 		# Note: mode & 0770000 gives you the non-permission bits.
 		# Should be S_IDIR (040000); I guess you can assume this.
 		# Also see note about self.GetContext() in mknod.
-		logging.info("mkdir: %s (mode %s)" % (path, oct(mode)))
+		logging.debug("mkdir: %s (mode %s)" % (path, oct(mode)))
 		os.mkdir("." + path, mode)
 
 	def utime(self, path, times):
@@ -269,7 +269,7 @@ class Sha1FS(Fuse):
 		Deprecated in favour of utimens.
 		"""
 		atime, mtime = times
-		logging.info("utime: %s (atime %s, mtime %s)" % (path, atime, mtime))
+		logging.debug("utime: %s (atime %s, mtime %s)" % (path, atime, mtime))
 		os.utime("." + path, times)
 
 #    The following utimens method would do the same as the above utime method.
@@ -290,7 +290,7 @@ class Sha1FS(Fuse):
 		May not always be called. For example, when opening a file, open may
 		be called and access avoided.
 		"""
-		logging.info("access: %s (flags %s)" % (path, oct(flags)))
+		logging.debug("access: %s (flags %s)" % (path, oct(flags)))
 		if not os.access("." + path, flag2accessflag(flags)):
 			return -EACCES
 		else:
@@ -348,17 +348,17 @@ class Sha1FS(Fuse):
 		
 		The mountpoint is not stored in cmdline.
 		"""
-		logging.info("Nonoption arguments: " + str(self.cmdline[1]))
+		logging.debug("Nonoption arguments: " + str(self.cmdline[1]))
 		
 		
 		#self.xyz = self.cmdline[0].xyz
 		#if self.xyz != None:
-		#		logging.info("xyz set to '" + self.xyz + "'")
+		#		logging.debug("xyz set to '" + self.xyz + "'")
 		#else:
-		#		logging.info("xyz not set")
+		#		logging.debug("xyz not set")
 		
 		os.chdir(self.root)
-		logging.info("Filesystem %s mounted" % self.root)
+		logging.debug("Filesystem %s mounted" % self.root)
 
 	### FILE OPERATION METHODS ###
 	# Methods in this section are operations for opening files and working on
@@ -385,11 +385,7 @@ class Sha1FS(Fuse):
 		Should return -errno.EACCES if disallowed.
 		"""
 		mode = flag2mode(flags)
-		logging.info("open: %s (flags %s) (mode %s)" % (path, oct(flags), mode))
-		#logging.info(os.access("." + path, flags))
-		#if not os.access("." + path, os.W_OK|os.R_OK):
-		#	return -EACCES
-		#return os.fdopen(os.open("." + path, flags), flag2mode(flags))
+		logging.debug("open: %s (flags %s) (mode %s)" % (path, oct(flags), mode))
 
 		fh = os.fdopen(os.open("." + path, flags), flag2mode(flags))
 		
@@ -398,7 +394,6 @@ class Sha1FS(Fuse):
 		
 		context = self.GetContext()
 		accessflags = flag2accessflag(flags)
-		logging.info("---------- %s ; %s" % (accessflags, os.R_OK))
 		#if not fh.stat.check_permission(context['uid'], context['gid'], accessflags):
 		if not os.access("." + path, accessflags):
 			return -EACCES
@@ -417,7 +412,7 @@ class Sha1FS(Fuse):
 				# Always 0 for regular files or FIFO buffers.
 		# See "open" for return value.
 		# """
-		# logging.info("create: %s (mode %s, rdev %s)" % (path,oct(mode),rdev))
+		# logging.debug("create: %s (mode %s, rdev %s)" % (path,oct(mode),rdev))
 		# self.mknod(path, mode, rdev)
 		# return self.open(path, flags)
 
@@ -438,7 +433,7 @@ class Sha1FS(Fuse):
 		available (and it is a non-blocking read), return -errno.EAGAIN.
 		If it is a blocking read, just block until ready.
 		"""
-		logging.info("read: %s (size %s, offset %s, fh %s)"
+		logging.debug("read: %s (size %s, offset %s, fh %s)"
 				% (path, size, offset, fh))
 		fh.seek(offset)
 		return fh.read(size)
@@ -457,7 +452,7 @@ class Sha1FS(Fuse):
 		be equal to len(buf) unless an error occured). May also be a negative
 		int, which is an errno code.
 		"""
-		logging.info("write: %s (offset %s, fh %s)" % (path, offset, fh))
+		logging.debug("write: %s (offset %s, fh %s)" % (path, offset, fh))
 		logging.debug("  buf: %r" % buf)
 		fh.seek(offset)
 		fh.write(buf)
@@ -478,7 +473,7 @@ class Sha1FS(Fuse):
 		Same as Fuse.truncate, but may be given a file handle to an open file,
 		so it can use that instead of having to look up the path.
 		"""
-		logging.info("ftruncate: %s (size %s, fh %s)" % (path, size, fh))
+		logging.debug("ftruncate: %s (size %s, fh %s)" % (path, size, fh))
 		fh.truncate(size)
 		
 	def _fflush(self, fh):
@@ -491,7 +486,7 @@ class Sha1FS(Fuse):
 		This is NOT an fsync (I think the difference is fsync goes both ways,
 		while flush is just one-way).
 		"""
-		logging.info("flush: %s (fh %s)" % (path, fh))
+		logging.debug("flush: %s (fh %s)" % (path, fh))
 		self._fflush(fh)
 		# cf. xmp_flush() in fusexmp_fh.c
 		os.close(os.dup(fh.fileno()))
@@ -509,7 +504,7 @@ class Sha1FS(Fuse):
 		Synchronises an open file.
 		datasync: If True, only flush user data, not metadata.
 		"""
-		logging.info("fsync: %s (datasync %s, fh %s)" % (path, datasync, fh))
+		logging.debug("fsync: %s (datasync %s, fh %s)" % (path, datasync, fh))
 		self._fflush(fh)
 		if datasync and hasattr(os, 'fdatasync'):
 			os.fdatasync(fh.fileno())
@@ -543,7 +538,7 @@ class Sha1FS(Fuse):
 			available (and it is a non-blocking read), return -errno.EAGAIN.
 			If it is a blocking read, just block until ready.
 			"""
-			logging.info("read: %s (length %s, offset %s)" % (self.path, length, offset))
+			logging.debug("read: %s (length %s, offset %s)" % (self.path, length, offset))
 			self.file.seek(offset)
 			return self.file.read(length)
 
@@ -561,7 +556,7 @@ class Sha1FS(Fuse):
 			be equal to len(buf) unless an error occured). May also be a negative
 			int, which is an errno code.
 			"""
-			logging.info("write: %s (offset %s)" % (self.path, offset))
+			logging.debug("write: %s (offset %s)" % (self.path, offset))
 			logging.debug("  buf: %r" % buf)
 			self.file.seek(offset)
 			self.file.write(buf)
@@ -572,7 +567,7 @@ class Sha1FS(Fuse):
 			Closes an open file. Allows filesystem to clean up.
 			mode: The same flags the file was opened with (see open).
 			"""
-			logging.info("release: %s (flags %s)" % (self.path, oct(flags)))
+			logging.debug("release: %s (flags %s)" % (self.path, oct(flags)))
 			self.file.close()
 
 		def _fflush(self):
@@ -584,7 +579,7 @@ class Sha1FS(Fuse):
 			Synchronises an open file.
 			isfsyncfile: If True, only flush user data, not metadata.
 			"""
-			logging.info("fsync: %s (isfsyncfile %s)" % (self.path, isfsyncfile))
+			logging.debug("fsync: %s (isfsyncfile %s)" % (self.path, isfsyncfile))
 			self._fflush()
 			if isfsyncfile and hasattr(os, 'fdatasync'):
 				os.fdatasync(self.fd)
@@ -597,7 +592,7 @@ class Sha1FS(Fuse):
 			This is NOT an fsync (I think the difference is fsync goes both ways,
 			while flush is just one-way).
 			"""
-			logging.info("flush: %s" % self.path)
+			logging.debug("flush: %s" % self.path)
 			self._fflush()
 			# cf. xmp_flush() in fusexmp_fh.c
 			os.close(os.dup(self.fd))
@@ -617,7 +612,7 @@ class Sha1FS(Fuse):
 			Same as Fuse.truncate, but may be given a file handle to an open file,
 			so it can use that instead of having to look up the path.
 			"""
-			logging.info("ftruncate: %s (size %s)" % (self.path, length))
+			logging.debug("ftruncate: %s (size %s)" % (self.path, length))
 			self.file.truncate(length)
 
 		def lock(self, cmd, owner, **kw):
