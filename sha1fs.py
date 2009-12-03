@@ -290,7 +290,7 @@ class Sha1FS(Fuse):
 		May not always be called. For example, when opening a file, open may
 		be called and access avoided.
 		"""
-		logging.debug("access: %s (flags %s)" % (path, oct(flags)))
+		logging.info("access: %s (flags %s)" % (path, oct(flags)))
 		if not os.access("." + path, flag2accessflag(flags)):
 			return -EACCES
 		else:
@@ -496,6 +496,8 @@ class Sha1FS(Fuse):
 		Closes an open file. Allows filesystem to clean up.
 		flags: The same flags the file was opened with (see open).
 		"""
+		#with open(path, 'r') as f:
+		#	sumfile(f)
 		logging.info("release: %s (flags %s, fh %s)" % (path, oct(flags), fh))
 		fh.close()
 		
