@@ -68,6 +68,16 @@ def sumfile(fobj):
 			break
 		m.update(d)
 	return m.hexdigest()
+	
+class ewrap:
+	def __init__(self, funcName):
+		self.funcName = funcName
+	def __enter__(self):
+		return self.funcName
+	def __exit__(self, type, value, traceback):
+		if not value is None:
+			logging.info("!! Exception in %s: %s" % (self.funcName, value))
+
 
 class Sha1FS(Fuse):
 	def __init__(self, *args, **kw):
@@ -120,8 +130,9 @@ class Sha1FS(Fuse):
 		Returns -errno.ENOENT if the file is not found, or another negative
 		errno code if another error occurs.
 		"""
-		logging.debug("getattr: %s" % path)
-		return os.lstat("." + path)
+		with ewrap("getattr"):
+			logging.debug("getattr: %s" % path)
+			return os.lstat("." + path)
 
 	def readlink(self, path):
 		"""
@@ -129,8 +140,9 @@ class Sha1FS(Fuse):
 		Returns a bytestring with the contents of a symlink (its target).
 		May also return an int error code.
 		"""
-		logging.debug("readlink: %s" % path)
-		return os.readlink("." + path)
+		with ewrap("readlink"):
+			logging.debug("readlink: %s" % path)
+			return os.readlink("." + path)
 
 	def readdir(self, path, offset):
 		"""
@@ -144,19 +156,22 @@ class Sha1FS(Fuse):
 		request starting the listing partway through (which I clearly don't
 		yet support). Seems to always be 0 anyway.
 		"""
-		logging.debug("readdir: %s (offset %s)" % (path, offset))
-		for e in os.listdir("." + path):
-			yield fuse.Direntry(e)
+		with ewrap("readdir"):
+			logging.debug("readdir: %s (offset %s)" % (path, offset))
+			for e in os.listdir("." + path):
+				yield fuse.Direntry(e)
 
 	def unlink(self, path):
 		"""Deletes a file."""
-		logging.info("unlink: %s" % path)
-		os.unlink("." + path)
+		with ewrap("unlink"):
+			logging.info("unlink: %s" % path)
+			os.unlink("." + path)
 
 	def rmdir(self, path):
 		"""Deletes a directory."""
-		logging.debug("rmdir: %s" % path)
-		os.rmdir("." + path)
+		with ewrap("rmdir"):
+			logging.debug("rmdir: %s" % path)
+			os.rmdir("." + path)
 
 	def symlink(self, target, name):
 		"""
@@ -177,8 +192,9 @@ class Sha1FS(Fuse):
 		system, it will not touch this system at all (symlinks do not depend
 		on the target system unless followed).
 		"""
-		logging.debug("symlink: target %s, name: %s" % (target, name))
-		os.symlink(target, "." + name)
+		with ewrap("symlink"):
+			logging.debug("symlink: target %s, name: %s" % (target, name))
+			os.symlink(target, "." + name)
 
 	def rename(self, old, new):
 		"""
@@ -189,8 +205,9 @@ class Sha1FS(Fuse):
 		If the operating system needs to move files across systems, it will
 		manually copy and delete the file, and this method will not be called.
 		"""
-		logging.debug("rename: target %s, name: %s" % (old, new))
-		os.rename("." + old, "." + new)
+		with ewrap("rename"):
+			logging.debug("rename: target %s, name: %s" % (old, new))
+			os.rename("." + old, "." + new)
 
 	def link(self, target, name):
 		"""
@@ -198,22 +215,26 @@ class Sha1FS(Fuse):
 		relative to the mounted file system. Hard-links across systems are not
 		supported.
 		"""
-		logging.debug("link: target %s, name: %s" % (target, name))
-		os.link("." + target, "." + name)
+		with ewrap("link"):
+			logging.debug("link: target %s, name: %s" % (target, name))
+			os.link("." + target, "." + name)
 
 	def chmod(self, path, mode):
 		"""Changes the mode of a file or directory."""
-		logging.debug("chmod: %s (mode %s)" % (path, oct(mode)))
-		os.chmod("." + path, mode)
+		with ewrap("chmod"):
+			logging.debug("chmod: %s (mode %s)" % (path, oct(mode)))
+			os.chmod("." + path, mode)
 
 	def chown(self, path, user, group):
 		"""Changes the owner of a file or directory."""
-		logging.debug("chown: %s (uid %s, gid %s)" % (path, user, group))
-		os.chown("." + path, user, group)
+		with ewrap("chown"):
+			logging.debug("chown: %s (uid %s, gid %s)" % (path, user, group))
+			os.chown("." + path, user, group)
 
 	def truncate(self, path, len):
-		with file("." + path, "a"):
-			f.truncate(len)
+		with ewrap("truncate"):
+			with file("." + path, "a") as f:
+				f.truncate(len)
 
 	def mknod(self, path, mode, rdev):
 		"""
@@ -241,8 +262,9 @@ class Sha1FS(Fuse):
 		#   executing the current syscall. This should be handy when creating
 		#   new files and directories, because they should be owned by this
 		#   user/group.
-		logging.debug("mknod: %s (mode %s, rdev %s)" % (path, oct(mode), rdev))
-		os.mknod("." + path, mode, rdev)
+		with ewrap("mknod"):
+			logging.debug("mknod: %s (mode %s, rdev %s)" % (path, oct(mode), rdev))
+			os.mknod("." + path, mode, rdev)
 		#connection = sqlite.connect(database)
 		#cursor = connection.cursor()
 		#cursor.execute("""insert into files(path,chksum) values('1','1');""")
@@ -259,8 +281,9 @@ class Sha1FS(Fuse):
 		# Note: mode & 0770000 gives you the non-permission bits.
 		# Should be S_IDIR (040000); I guess you can assume this.
 		# Also see note about self.GetContext() in mknod.
-		logging.debug("mkdir: %s (mode %s)" % (path, oct(mode)))
-		os.mkdir("." + path, mode)
+		with ewrap("mkdir"):
+			logging.debug("mkdir: %s (mode %s)" % (path, oct(mode)))
+			os.mkdir("." + path, mode)
 
 	def utime(self, path, times):
 		"""
@@ -268,9 +291,10 @@ class Sha1FS(Fuse):
 		times: (atime, mtime) pair. Both ints, in seconds since epoch.
 		Deprecated in favour of utimens.
 		"""
-		atime, mtime = times
-		logging.debug("utime: %s (atime %s, mtime %s)" % (path, atime, mtime))
-		os.utime("." + path, times)
+		with ewrap("utime"):
+			atime, mtime = times
+			logging.debug("utime: %s (atime %s, mtime %s)" % (path, atime, mtime))
+			os.utime("." + path, times)
 
 #    The following utimens method would do the same as the above utime method.
 #    We can't make it better though as the Python stdlib doesn't know of
@@ -290,11 +314,12 @@ class Sha1FS(Fuse):
 		May not always be called. For example, when opening a file, open may
 		be called and access avoided.
 		"""
-		logging.info("access: %s (flags %s)" % (path, oct(flags)))
-		if not os.access("." + path, flag2accessflag(flags)):
-			return -EACCES
-		else:
-			return 0
+		with ewrap("access"):
+			logging.info("access: %s (flags %s)" % (path, oct(flags)))
+			if not os.access("." + path, flag2accessflag(flags)):
+				return -EACCES
+			else:
+				return 0
 
 #    This is how we could add stub extended attribute handlers...
 #    (We can't have ones which aptly delegate requests to the underlying fs
@@ -334,7 +359,8 @@ class Sha1FS(Fuse):
 				- f_files - total number of file inodes
 				- f_ffree - nunber of free file inodes
 		"""
-		return os.statvfs(".")
+		with ewrap("statfs"):
+			return os.statvfs(".")
 
 	def fsinit(self):
 		"""
@@ -348,17 +374,18 @@ class Sha1FS(Fuse):
 		
 		The mountpoint is not stored in cmdline.
 		"""
-		logging.debug("Nonoption arguments: " + str(self.cmdline[1]))
-		
-		
-		#self.xyz = self.cmdline[0].xyz
-		#if self.xyz != None:
-		#		logging.debug("xyz set to '" + self.xyz + "'")
-		#else:
-		#		logging.debug("xyz not set")
-		
-		os.chdir(self.root)
-		logging.debug("Filesystem %s mounted" % self.root)
+		with ewrap("fsinit"):
+			logging.debug("Nonoption arguments: " + str(self.cmdline[1]))
+			
+			
+			#self.xyz = self.cmdline[0].xyz
+			#if self.xyz != None:
+			#		logging.debug("xyz set to '" + self.xyz + "'")
+			#else:
+			#		logging.debug("xyz not set")
+			
+			os.chdir(self.root)
+			logging.debug("Filesystem %s mounted" % self.root)
 
 	### FILE OPERATION METHODS ###
 	# Methods in this section are operations for opening files and working on
@@ -384,21 +411,22 @@ class Sha1FS(Fuse):
 		On failure, should return a negative errno code.
 		Should return -errno.EACCES if disallowed.
 		"""
-		mode = flag2mode(flags)
-		logging.debug("open: %s (flags %s) (mode %s)" % (path, oct(flags), mode))
-
-		fh = os.fdopen(os.open("." + path, flags), flag2mode(flags))
-		
-		if fh is None:
-			return -ENOENT
-		
-		context = self.GetContext()
-		accessflags = flag2accessflag(flags)
-		#if not fh.stat.check_permission(context['uid'], context['gid'], accessflags):
-		if not os.access("." + path, accessflags):
-			return -EACCES
-
-		return fh
+		with ewrap("open"):
+			mode = flag2mode(flags)
+			logging.debug("open: %s (flags %s) (mode %s)" % (path, oct(flags), mode))
+	
+			fh = os.fdopen(os.open("." + path, flags), flag2mode(flags))
+			
+			if fh is None:
+				return -ENOENT
+			
+			context = self.GetContext()
+			accessflags = flag2accessflag(flags)
+			#if not fh.stat.check_permission(context['uid'], context['gid'], accessflags):
+			if not os.access("." + path, accessflags):
+				return -EACCES
+	
+			return fh
 		
 		
 	# def create(self, path, mode, rdev):
@@ -433,10 +461,11 @@ class Sha1FS(Fuse):
 		available (and it is a non-blocking read), return -errno.EAGAIN.
 		If it is a blocking read, just block until ready.
 		"""
-		logging.debug("read: %s (size %s, offset %s, fh %s)"
-				% (path, size, offset, fh))
-		fh.seek(offset)
-		return fh.read(size)
+		with ewrap("read"):
+			logging.debug("read: %s (size %s, offset %s, fh %s)"
+					% (path, size, offset, fh))
+			fh.seek(offset)
+			return fh.read(size)
 		
 	def write(self, path, buf, offset, fh=None):
 		"""
@@ -452,11 +481,12 @@ class Sha1FS(Fuse):
 		be equal to len(buf) unless an error occured). May also be a negative
 		int, which is an errno code.
 		"""
-		logging.debug("write: %s (offset %s, fh %s)" % (path, offset, fh))
-		logging.debug("  buf: %r" % buf)
-		fh.seek(offset)
-		fh.write(buf)
-		return len(buf)
+		with ewrap("write"):
+			logging.debug("write: %s (offset %s, fh %s)" % (path, offset, fh))
+			logging.debug("  buf: %r" % buf)
+			fh.seek(offset)
+			fh.write(buf)
+			return len(buf)
 		
 	def fgetattr(self, path, fh=None):
 		"""
@@ -464,8 +494,9 @@ class Sha1FS(Fuse):
 		Same as Fuse.getattr, but may be given a file handle to an open file,
 		so it can use that instead of having to look up the path.
 		"""
-		logging.debug("fgetattr: %s (fh %s)" % (path, fh))
-		return os.fstat(fh.fileno())
+		with ewrap("fgetattr"):
+			logging.debug("fgetattr: %s (fh %s)" % (path, fh))
+			return os.fstat(fh.fileno())
 		
 	def ftruncate(self, path, size, fh=None):
 		"""
@@ -473,8 +504,9 @@ class Sha1FS(Fuse):
 		Same as Fuse.truncate, but may be given a file handle to an open file,
 		so it can use that instead of having to look up the path.
 		"""
-		logging.debug("ftruncate: %s (size %s, fh %s)" % (path, size, fh))
-		fh.truncate(size)
+		with ewrap("ftruncate"):
+			logging.debug("ftruncate: %s (size %s, fh %s)" % (path, size, fh))
+			fh.truncate(size)
 		
 	def _fflush(self, fh):
 		if 'w' in fh.mode or 'a' in fh.mode:
@@ -486,32 +518,35 @@ class Sha1FS(Fuse):
 		This is NOT an fsync (I think the difference is fsync goes both ways,
 		while flush is just one-way).
 		"""
-		logging.debug("flush: %s (fh %s)" % (path, fh))
-		self._fflush(fh)
-		# cf. xmp_flush() in fusexmp_fh.c
-		os.close(os.dup(fh.fileno()))
+		with ewrap("flush"):
+			logging.debug("flush: %s (fh %s)" % (path, fh))
+			self._fflush(fh)
+			# cf. xmp_flush() in fusexmp_fh.c
+			os.close(os.dup(fh.fileno()))
 		
 	def release(self, path, flags, fh=None):
 		"""
 		Closes an open file. Allows filesystem to clean up.
 		flags: The same flags the file was opened with (see open).
 		"""
-		#with open(path, 'r') as f:
-		#	sumfile(f)
-		logging.info("release: %s (flags %s, fh %s)" % (path, oct(flags), fh))
-		fh.close()
+		with ewrap("release"):
+			#with open(path, 'r') as f:
+			#	sumfile(f)
+			logging.info("release: %s (flags %s, fh %s)" % (path, oct(flags), fh))
+			fh.close()
 		
 	def fsync(self, path, datasync, fh=None):
 		"""
 		Synchronises an open file.
 		datasync: If True, only flush user data, not metadata.
 		"""
-		logging.debug("fsync: %s (datasync %s, fh %s)" % (path, datasync, fh))
-		self._fflush(fh)
-		if datasync and hasattr(os, 'fdatasync'):
-			os.fdatasync(fh.fileno())
-		else:
-			os.fsync(fh.fileno())
+		with ewrap("fsync"):
+			logging.debug("fsync: %s (datasync %s, fh %s)" % (path, datasync, fh))
+			self._fflush(fh)
+			if datasync and hasattr(os, 'fdatasync'):
+				os.fdatasync(fh.fileno())
+			else:
+				os.fsync(fh.fileno())
 
 	#####################
 
@@ -656,6 +691,8 @@ class Sha1FS(Fuse):
 				return -EINVAL
 
 			fcntl.lockf(self.fd, op, kw['l_start'], kw['l_len'])
+
+#######################
 
 	def main(self, *a, **kw):
 		#self.file_class = self.Sha1File
