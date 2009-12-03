@@ -724,16 +724,16 @@ Userspace SHA1 checksum FS: mirror the filesystem tree, adding and updating file
 	# init the database if it does not exist
 	dbExists = os.path.exists(database)
 	
-	connection = sqlite.connect(database)	
+		
 	if not dbExists:
-		cursor = connection.cursor()
-		cursor.execute("""create table if not exists files(
-path varchar not null unique,
-chksum varchar not null);""")
-		cursor.close()
-
-		connection.commit
-	connection.close()
+		with sqlite.connect(database) as connection:
+			cursor = connection.cursor()
+			cursor.execute("""create table if not exists files(
+	path varchar not null unique,
+	chksum varchar not null);""")
+			cursor.close()
+	
+			connection.commit
 	#with file(opts.database, 'a'):
 	#	os.utime(opts.database, None)
 
