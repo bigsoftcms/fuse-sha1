@@ -59,7 +59,7 @@ def flag2accessflag(flags):
 
 	return m
 
-def sumfile(fobj):
+def sha1sum(fobj):
 	'''Returns a SHA1 hash for an object with read() method.'''
 	m = hashlib.sha1()
 	while True:
@@ -69,6 +69,7 @@ def sumfile(fobj):
 		m.update(d)
 	return m.hexdigest()
 	
+# Wraps a code block so that if an exception occurs, it is logged
 class ewrap:
 	def __init__(self, funcName):
 		self.funcName = funcName
@@ -107,18 +108,21 @@ class Sha1FS(Fuse):
 	def execSql(self, sql):
 		connection = None
 		try:
-			connection = sqlite.connect(self.opts.database)
+			if not sql.endswith(";"): sql = sql + ";"
+			opts, args = self.cmdline
+			#logging.info("Running SQL %s for database %s" % (sql, opts.database))
+			connection = sqlite.connect(opts.database)
 			cursor = None
 			try:
 				cursor = connection.cursor()
 				cursor.execute(sql)
 				cursor.close()
 
-				connection.commit
+				connection.commit()
 			except:
-				logger.error("Unable to exec %s" % sql)
-				cursor.close
-				connection.rollback
+				logging.error("Unable to exec %s" % sql)
+				cursor.close()
+				connection.rollback()
 		finally:
 			if (connection is not None): connection.close()
 
@@ -530,10 +534,12 @@ class Sha1FS(Fuse):
 		flags: The same flags the file was opened with (see open).
 		"""
 		with ewrap("release"):
-			#with open(path, 'r') as f:
-			#	sumfile(f)
 			logging.info("release: %s (flags %s, fh %s)" % (path, oct(flags), fh))
 			fh.close()
+			with open("." + path, 'r') as f:
+				chksum = sha1sum(f)
+				# this is super unsafe SQL, but since I consider this low security, it's probably OK
+				self.execSql("insert or replace into files(path, chksum) values('%s', '%s')" % (path, chksum))
 		
 	def fsync(self, path, datasync, fh=None):
 		"""
@@ -729,7 +735,7 @@ Userspace SHA1 checksum FS: mirror the filesystem tree, adding and updating file
 		with sqlite.connect(database) as connection:
 			cursor = connection.cursor()
 			cursor.execute("""create table if not exists files(
-	path varchar not null unique,
+	path varchar not null primary key,
 	chksum varchar not null);""")
 			cursor.close()
 	
