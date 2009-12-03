@@ -52,6 +52,12 @@ def flag2mode(flags):
 		m = m.replace('w', 'a', 1)
 
 	return m
+	
+def flag2accessflag(flags):
+	md = {os.O_RDONLY: os.R_OK, os.O_WRONLY: os.W_OK, os.O_RDWR: (os.W_OK | os.R_OK)}
+	m = md[flags & (os.O_RDONLY | os.O_WRONLY | os.O_RDWR)]
+
+	return m
 
 def sumfile(fobj):
 	'''Returns a SHA1 hash for an object with read() method.'''
@@ -273,7 +279,7 @@ class Sha1FS(Fuse):
 #    def utimens(self, path, ts_acc, ts_mod):
 #      os.utime("." + path, (ts_acc.tv_sec, ts_mod.tv_sec))
 
-	def access(self, path, mode):
+	def access(self, path, flags):
 		"""
 		Checks permissions for accessing a file or directory.
 		mode: As described in man 2 access (Linux Programmer's Manual).
@@ -284,9 +290,11 @@ class Sha1FS(Fuse):
 		May not always be called. For example, when opening a file, open may
 		be called and access avoided.
 		"""
-		logging.info("access: %s (flags %s)" % (path, oct(mode)))
-		if not os.access("." + path, mode):
+		logging.info("access: %s (flags %s)" % (path, oct(flags)))
+		if not os.access("." + path, flag2accessflag(flags)):
 			return -EACCES
+		else:
+			return 0
 
 #    This is how we could add stub extended attribute handlers...
 #    (We can't have ones which aptly delegate requests to the underlying fs
@@ -352,8 +360,163 @@ class Sha1FS(Fuse):
 		os.chdir(self.root)
 		logging.info("Filesystem %s mounted" % self.root)
 
-######################################
-######################################
+	### FILE OPERATION METHODS ###
+	# Methods in this section are operations for opening files and working on
+	# open files.
+	# "open" and "create" are methods for opening files. They *may* return an
+	# arbitrary Python object (not None or int), which is used as a file
+	# handle by the methods for working on files.
+	# All the other methods (fgetattr, release, read, write, fsync, flush,
+	# ftruncate and lock) are methods for working on files. They should all be
+	# prepared to accept an optional file-handle argument, which is whatever
+	# object "open" or "create" returned.
+	##################################
+	def open(self, path, flags):
+		"""
+		Open a file for reading/writing, and check permissions.
+		flags: As described in man 2 open (Linux Programmer's Manual).
+				ORing of several access flags, including one of os.O_RDONLY,
+				os.O_WRONLY or os.O_RDWR. All other flags are in os as well.
+		
+		On success, *may* return an arbitrary Python object, which will be
+		used as the "fh" argument to all the file operation methods on the
+		file. Or, may just return None on success.
+		On failure, should return a negative errno code.
+		Should return -errno.EACCES if disallowed.
+		"""
+		mode = flag2mode(flags)
+		logging.info("open: %s (flags %s) (mode %s)" % (path, oct(flags), mode))
+		#logging.info(os.access("." + path, flags))
+		#if not os.access("." + path, os.W_OK|os.R_OK):
+		#	return -EACCES
+		#return os.fdopen(os.open("." + path, flags), flag2mode(flags))
+
+		fh = os.fdopen(os.open("." + path, flags), flag2mode(flags))
+		
+		if fh is None:
+			return -ENOENT
+		
+		context = self.GetContext()
+		accessflags = flag2accessflag(flags)
+		logging.info("---------- %s ; %s" % (accessflags, os.R_OK))
+		#if not fh.stat.check_permission(context['uid'], context['gid'], accessflags):
+		if not os.access("." + path, accessflags):
+			return -EACCES
+
+		return fh
+		
+		
+	# def create(self, path, mode, rdev):
+		# """
+		# Creates a file and opens it for writing.
+		# Will be called in favour of mknod+open, but it's optional (OS will
+		# fall back on that sequence).
+		# mode: Unix file mode flags for the file being created.
+		# rdev: Special properties for creation of character or block special
+				# devices (I've never gotten this to work).
+				# Always 0 for regular files or FIFO buffers.
+		# See "open" for return value.
+		# """
+		# logging.info("create: %s (mode %s, rdev %s)" % (path,oct(mode),rdev))
+		# self.mknod(path, mode, rdev)
+		# return self.open(path, flags)
+
+	def read(self, path, size, offset, fh=None):
+		"""
+		Get all or part of the contents of a file.
+		size: Size in bytes to read.
+		offset: Offset in bytes from the start of the file to read from.
+		Does not need to check access rights (operating system will always
+		call access or open first).
+		Returns a byte string with the contents of the file, with a length no
+		greater than 'size'. May also return an int error code.
+		
+		If the length of the returned string is 0, it indicates the end of the
+		file, and the OS will not request any more. If the length is nonzero,
+		the OS may request more bytes later.
+		To signal that it is NOT the end of file, but no bytes are presently
+		available (and it is a non-blocking read), return -errno.EAGAIN.
+		If it is a blocking read, just block until ready.
+		"""
+		logging.info("read: %s (size %s, offset %s, fh %s)"
+				% (path, size, offset, fh))
+		fh.seek(offset)
+		return fh.read(size)
+		
+	def write(self, path, buf, offset, fh=None):
+		"""
+		Write over part of a file.
+		buf: Byte string containing the text to write.
+		offset: Offset in bytes from the start of the file to write to.
+		Does not need to check access rights (operating system will always
+		call access or open first).
+		Should only overwrite the part of the file from offset to
+		offset+len(buf).
+		
+		Must return an int: the number of bytes successfully written (should
+		be equal to len(buf) unless an error occured). May also be a negative
+		int, which is an errno code.
+		"""
+		logging.info("write: %s (offset %s, fh %s)" % (path, offset, fh))
+		logging.debug("  buf: %r" % buf)
+		fh.seek(offset)
+		fh.write(buf)
+		return len(buf)
+		
+	def fgetattr(self, path, fh=None):
+		"""
+		Retrieves information about a file (the "stat" of a file).
+		Same as Fuse.getattr, but may be given a file handle to an open file,
+		so it can use that instead of having to look up the path.
+		"""
+		logging.debug("fgetattr: %s (fh %s)" % (path, fh))
+		return os.fstat(fh.fileno())
+		
+	def ftruncate(self, path, size, fh=None):
+		"""
+		Shrink or expand a file to a given size.
+		Same as Fuse.truncate, but may be given a file handle to an open file,
+		so it can use that instead of having to look up the path.
+		"""
+		logging.info("ftruncate: %s (size %s, fh %s)" % (path, size, fh))
+		fh.truncate(size)
+		
+	def _fflush(self, fh):
+		if 'w' in fh.mode or 'a' in fh.mode:
+			fh.flush()
+		
+	def flush(self, path, fh=None):
+		"""
+		Flush cached data to the file system.
+		This is NOT an fsync (I think the difference is fsync goes both ways,
+		while flush is just one-way).
+		"""
+		logging.info("flush: %s (fh %s)" % (path, fh))
+		self._fflush(fh)
+		# cf. xmp_flush() in fusexmp_fh.c
+		os.close(os.dup(fh.fileno()))
+		
+	def release(self, path, flags, fh=None):
+		"""
+		Closes an open file. Allows filesystem to clean up.
+		flags: The same flags the file was opened with (see open).
+		"""
+		logging.info("release: %s (flags %s, fh %s)" % (path, oct(flags), fh))
+		fh.close()
+		
+	def fsync(self, path, datasync, fh=None):
+		"""
+		Synchronises an open file.
+		datasync: If True, only flush user data, not metadata.
+		"""
+		logging.info("fsync: %s (datasync %s, fh %s)" % (path, datasync, fh))
+		self._fflush(fh)
+		if datasync and hasattr(os, 'fdatasync'):
+			os.fdatasync(fh.fileno())
+		else:
+			os.fsync(fh.fileno())
+
+	#####################
 
 	class Sha1File(object):
 		def __init__(self, path, flags, *mode):
@@ -361,11 +524,12 @@ class Sha1FS(Fuse):
 			#logging.info("%s: %s" % (path, sumfile(self.file)))
 			self.fd = self.file.fileno()
 			self.path = "." + path
+			#logging.info("=============================== %s" % self.opts)
 
 		def read(self, length, offset):
 			"""
 			Get all or part of the contents of a file.
-			size: Size in bytes to read.
+			length: Size in bytes to read.
 			offset: Offset in bytes from the start of the file to read from.
 			Does not need to check access rights (operating system will always
 			call access or open first).
@@ -403,12 +567,12 @@ class Sha1FS(Fuse):
 			self.file.write(buf)
 			return len(buf)
 
-		def release(self, mode):
+		def release(self, flags):
 			"""
 			Closes an open file. Allows filesystem to clean up.
 			mode: The same flags the file was opened with (see open).
 			"""
-			logging.info("release: %s (flags %s)" % (self.path, oct(mode)))
+			logging.info("release: %s (flags %s)" % (self.path, oct(flags)))
 			self.file.close()
 
 		def _fflush(self):
@@ -497,7 +661,7 @@ class Sha1FS(Fuse):
 			fcntl.lockf(self.fd, op, kw['l_start'], kw['l_len'])
 
 	def main(self, *a, **kw):
-		self.file_class = self.Sha1File
+		#self.file_class = self.Sha1File
 		return Fuse.main(self, *a, **kw)
 
 def main():
