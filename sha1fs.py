@@ -75,7 +75,7 @@ class Sha1FS(Xmp):
 		Xmp.__init__(self, *args, **kw)
 		
 		self.parser.add_option(mountopt="root", metavar="PATH", default='/',
-													 help="mirror filesystem from under PATH [default: %default]")
+			help="mirror filesystem from under PATH [default: %default]")
 		
 		self.parser.add_option("--database",
 													 dest = "database",
@@ -139,7 +139,7 @@ class Sha1FS(Xmp):
 		"""
 		with ewrap("readdir"):
 			logging.debug("readdir: %s (offset %s)" % (path, offset))
-			Xmp.readdir(self, path, offset)
+			return Xmp.readdir(self, path, offset)
 
 	def unlink(self, path):
 		"""Deletes a file."""
@@ -284,7 +284,7 @@ class Sha1FS(Xmp):
 		"""
 		# rewritten to use flag2accessflag and explicitly return 0 in the case of allowed access
 		with ewrap("access"):
-			logging.info("access: %s (flags %s)" % (path, oct(flags)))
+			logging.debug("access: %s (flags %s)" % (path, oct(flags)))
 			if not os.access("." + path, flag2accessflag(flags)):
 				return -EACCES
 			else:
