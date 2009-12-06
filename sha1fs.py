@@ -485,7 +485,7 @@ class Sha1FS(Xmp):
 		with ewrap("release"):
 			logging.info("release: %s (flags %s, fh %s)" % (path, oct(flags), fh))
 			fh.close()
-			with open("." + path, 'r') as f:
+			with open("." + path, 'rb') as f:
 				chksum = sha1sum(f)
 				# this is super unsafe SQL, but since I consider this low security, it's probably OK
 				self.execSql("insert or replace into files(path, chksum) values('%s', '%s')" % (path, chksum))
