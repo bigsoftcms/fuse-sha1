@@ -48,7 +48,7 @@ chksum varchar not null);""")
 					
 						if not os.path.exists(path):
 							logging.info("Removing entry for %s; file does not exist" % path)
-							cursor.execute("delete from files where path = '%s';" % path)
+							cursor.execute("delete from files where path = ?;", (path, ))
 							
 					querycursor.close()
 					cursor.close()
@@ -67,12 +67,11 @@ chksum varchar not null);""")
 	def updateChecksum(self, path):
 		with open(path, 'rb') as f:
 			chksum = sha1sum(f)
-			# this is super unsafe SQL, but since I consider this low security, it's probably OK
-			self._execSql("insert or replace into files(path, chksum) values('%s', '%s');" % (path, chksum))
+			self._execSql("insert or replace into files(path, chksum) values(?, ?);", (path, chksum))
 	
 	# Call to remove the checksum/path entry for the given path from the database
 	def removeChecksum(self, path):
-		self._execSql("delete from files where path = '%s';" % path)
+		self._execSql("delete from files where path = ?;", (path, ))
 		
 	# Makes sure the SQL statement has a "; at the end"
 	def _formatSql(self, sql):
@@ -80,17 +79,20 @@ chksum varchar not null);""")
 		return sql
 		
 	# internal method used to run arbitrary SQL on the SQLite database
-	def _execSql(self, sql):
+	def _execSql(self, sql, sqlargs = None):
 		sql = self._formatSql(sql)
-		logging.info("Running SQL '%s'" % sql)
+		logging.info("Running SQL %s with args %s" % (sql, sqlargs))
 		with sqlite.connect(self.database) as connection:
 			cursor = None
 			try:
 				cursor = connection.cursor()
-				cursor.execute(sql)
+				if sqlargs != None:
+					cursor.execute(sql, sqlargs)
+				else:
+					cursor.execute(sql)
 				cursor.close()
 			except Exception as einst:
-				logging.error("Unable to exec %s: %s" % (sql, einst))
+				logging.error("Unable to exec %s with args: %s" % (sql, sqlargs, einst))
 				if connection != None: connection.rollback()
 			else:
 				connection.commit()
