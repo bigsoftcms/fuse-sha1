@@ -33,35 +33,35 @@ chksum varchar not null);""")
 	# Check the paths in the database, removing entries for which no actual file exists
 	def vacuum(self):
 		logging.info("Vacuuming database")
-		connection = None
-		try:
-			connection = sqlite.connect(self.database)
+		with sqlite.connect(self.database) as connection:
 			querycursor = None
 			cursor = None
 			try:
 				querycursor = connection.cursor()
-				cursor = connection.cursor()
-				querycursor.execute("select path from files;")
-				while(1):
-					entry = querycursor.fetchone()
-					if entry == None: break
-					(path, ) = entry
-				
-					if not os.path.exists(path):
-						logging.info("Removing entry for %s; file does not exist" % path)
-						cursor.execute("delete from files where path = '%s';" % path)
-						
-				querycursor.close()
-				cursor.close()
-	
-				connection.commit()
-			except Exception as einst:
-				logging.error("Unable to vacuum database: %s" % einst)
-				cursor.close()
-				querycursor.close()
-				connection.rollback()
-		finally:
-			if (connection is not None): connection.close()
+				try:
+					cursor = connection.cursor()
+					querycursor.execute("select path from files;")
+					while(1):
+						entry = querycursor.fetchone()
+						if entry == None: break
+						(path, ) = entry
+					
+						if not os.path.exists(path):
+							logging.info("Removing entry for %s; file does not exist" % path)
+							cursor.execute("delete from files where path = '%s';" % path)
+							
+					querycursor.close()
+					cursor.close()
+				except Exception as einst:
+					logging.error("Unable to vacuum database: %s" % einst)
+					if connection != None: connection.rollback()
+					raise
+				else:
+					connection.commit()
+				finally:
+					if cursor != None: cursor.close()
+			finally:
+				if querycursor != None: querycursor.close()
 		
 	# Call to update/insert checksums for a given path
 	def updateChecksum(self, path):
@@ -82,20 +82,17 @@ chksum varchar not null);""")
 	# internal method used to run arbitrary SQL on the SQLite database
 	def _execSql(self, sql):
 		sql = self._formatSql(sql)
-		logging.debug("Running SQL '%s'" % sql)
-		connection = None
-		try:
-			connection = sqlite.connect(self.database)
+		logging.info("Running SQL '%s'" % sql)
+		with sqlite.connect(self.database) as connection:
 			cursor = None
 			try:
 				cursor = connection.cursor()
 				cursor.execute(sql)
 				cursor.close()
-	
-				connection.commit()
 			except Exception as einst:
 				logging.error("Unable to exec %s: %s" % (sql, einst))
-				cursor.close()
-				connection.rollback()
-		finally:
-			if (connection is not None): connection.close()
+				if connection != None: connection.rollback()
+			else:
+				connection.commit()
+			finally:
+				if cursor != None: cursor.close()
