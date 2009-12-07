@@ -293,7 +293,7 @@ class Sha1FS(Xmp):
 				- f_ffree - nunber of free file inodes
 		"""
 		with ewrap("statfs"):
-			return Xmp.statvfs(self)
+			return Xmp.statfs(self)
 
 	def fsinit(self):
 		"""
