@@ -32,6 +32,9 @@ import xmp
 from xmp import Xmp
 from xmp import flag2mode
 
+from fusesha1util import ewrap
+from sha1db import Sha1DB
+
 from pysqlite2 import dbapi2 as sqlite
 import logging
 import hashlib
@@ -48,27 +51,6 @@ def flag2accessflag(flags):
 
 	return m
 
-# Calculate an SHA1 hex digest for a file
-def sha1sum(fobj):
-	'''Returns a SHA1 hash for an object with read() method.'''
-	m = hashlib.sha1()
-	while True:
-		d = fobj.read(1024)
-		if not d:
-			break
-		m.update(d)
-	return m.hexdigest()
-	
-# Wraps a code block so that if an exception occurs, it is logged
-class ewrap:
-	def __init__(self, funcName):
-		self.funcName = funcName
-	def __enter__(self):
-		return self.funcName
-	def __exit__(self, type, value, traceback):
-		if not value is None:
-			logging.info("!! Exception in %s: %s" % (self.funcName, value))
-
 # The required FUSE class
 class Sha1FS(Xmp):
 	def __init__(self, *args, **kw):
@@ -81,27 +63,11 @@ class Sha1FS(Xmp):
 													 dest = "database",
 													 help = "location of SQLite checksum database (required)",
 													 metavar="DATABASE")
-
-	def execSql(self, sql):
-		connection = None
-		try:
-			if not sql.endswith(";"): sql = sql + ";"
-			opts, args = self.cmdline
-			logging.info("Running SQL %s for database %s" % (sql, opts.database))
-			connection = sqlite.connect(opts.database)
-			cursor = None
-			try:
-				cursor = connection.cursor()
-				cursor.execute(sql)
-				cursor.close()
-
-				connection.commit()
-			except:
-				logging.error("Unable to exec %s" % sql)
-				cursor.close()
-				connection.rollback()
-		finally:
-			if (connection is not None): connection.close()
+		
+	# Initializes the database for this class
+	def initDB(self):
+		opts, args = self.cmdline
+		self.sha1db = Sha1DB(opts.database)
 
 	def getattr(self, path):
 		"""
@@ -146,7 +112,7 @@ class Sha1FS(Xmp):
 		with ewrap("unlink"):
 			logging.info("unlink: %s" % path)
 			Xmp.unlink(self, path)
-			self.execSql("delete from files where path = '%s'" % path)
+			self.sha1db.removeChecksum("." + path)
 
 	def rmdir(self, path):
 		"""Deletes a directory."""
@@ -485,10 +451,7 @@ class Sha1FS(Xmp):
 		with ewrap("release"):
 			logging.info("release: %s (flags %s, fh %s)" % (path, oct(flags), fh))
 			fh.close()
-			with open("." + path, 'rb') as f:
-				chksum = sha1sum(f)
-				# this is super unsafe SQL, but since I consider this low security, it's probably OK
-				self.execSql("insert or replace into files(path, chksum) values('%s', '%s')" % (path, chksum))
+			self.sha1db.updateChecksum("." + path)
 		
 	def fsync(self, path, datasync, fh=None):
 		"""
@@ -518,6 +481,7 @@ Userspace SHA1 checksum FS: mirror the filesystem tree, adding and updating file
 									dash_s_do='setsingle')
 
 	server.parse(values=server, errex=1)
+	server.initDB()
 	opts, args = server.cmdline
 	
 	database = opts.database
@@ -527,19 +491,6 @@ Userspace SHA1 checksum FS: mirror the filesystem tree, adding and updating file
 		# how do I make this an arg?
 		print "Error: Missing SQLite database argument."
 		sys.exit()
-		
-	# init the database if it does not exist
-	dbExists = os.path.exists(database)
-	
-	if not dbExists:
-		with sqlite.connect(database) as connection:
-			cursor = connection.cursor()
-			cursor.execute("""create table if not exists files(
-	path varchar not null primary key,
-	chksum varchar not null);""")
-			cursor.close()
-	
-			connection.commit
 
 	try:
 		if server.fuse_args.mount_expected():
