@@ -81,7 +81,7 @@ chksum varchar not null);""")
 	# internal method used to run arbitrary SQL on the SQLite database
 	def _execSql(self, sql, sqlargs = None):
 		sql = self._formatSql(sql)
-		logging.info("Running SQL %s with args %s" % (sql, sqlargs))
+		logging.debug("Running SQL %s with args %s" % (sql, sqlargs))
 		with sqlite.connect(self.database) as connection:
 			cursor = None
 			try:
