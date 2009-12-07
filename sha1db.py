@@ -30,21 +30,59 @@ class Sha1DB:
 path varchar not null primary key,
 chksum varchar not null);""")
 	
+	# Check the paths in the database, removing entries for which no actual file exists
+	def vacuum(self):
+		logging.info("Vacuuming database")
+		connection = None
+		try:
+			connection = sqlite.connect(self.database)
+			querycursor = None
+			cursor = None
+			try:
+				querycursor = connection.cursor()
+				cursor = connection.cursor()
+				querycursor.execute("select path from files;")
+				while(1):
+					entry = querycursor.fetchone()
+					if entry == None: break
+					(path, ) = entry
+				
+					if not os.path.exists(path):
+						logging.info("Removing entry for %s; file does not exist" % path)
+						cursor.execute("delete from files where path = '%s';" % path)
+						
+				querycursor.close()
+				cursor.close()
+	
+				connection.commit()
+			except Exception as einst:
+				logging.error("Unable to vacuum database: %s" % einst)
+				cursor.close()
+				querycursor.close()
+				connection.rollback()
+		finally:
+			if (connection is not None): connection.close()
+		
 	# Call to update/insert checksums for a given path
 	def updateChecksum(self, path):
 		with open(path, 'rb') as f:
 			chksum = sha1sum(f)
 			# this is super unsafe SQL, but since I consider this low security, it's probably OK
-			self._execSql("insert or replace into files(path, chksum) values('%s', '%s')" % (path, chksum))
+			self._execSql("insert or replace into files(path, chksum) values('%s', '%s');" % (path, chksum))
 	
 	# Call to remove the checksum/path entry for the given path from the database
 	def removeChecksum(self, path):
-		self._execSql("delete from files where path = '%s'" % path)
-			
+		self._execSql("delete from files where path = '%s';" % path)
+		
+	# Makes sure the SQL statement has a "; at the end"
+	def _formatSql(self, sql):
+		if not sql.endswith(";"): sql = sql + ";"
+		return sql
+		
 	# internal method used to run arbitrary SQL on the SQLite database
 	def _execSql(self, sql):
-		if not sql.endswith(";"): sql = sql + ";"
-		logging.info("Running SQL '%s'" % sql)
+		sql = self._formatSql(sql)
+		logging.debug("Running SQL '%s'" % sql)
 		connection = None
 		try:
 			connection = sqlite.connect(self.database)
@@ -55,8 +93,8 @@ chksum varchar not null);""")
 				cursor.close()
 	
 				connection.commit()
-			except:
-				logging.error("Unable to exec %s" % sql)
+			except Exception as einst:
+				logging.error("Unable to exec %s: %s" % (sql, einst))
 				cursor.close()
 				connection.rollback()
 		finally:

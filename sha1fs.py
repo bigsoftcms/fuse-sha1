@@ -73,12 +73,16 @@ class Sha1FS(Xmp):
 		# Initialize so we can look for this option even if the user didn't specify it
 		self.rescan = False
 		
-	# Initializes the database for this class
+	# Initializes the database for this class.  If rescan is enabled, this will vacuum the DB
+	# (ie remove nonexistent paths) and will scan for new/updated files
+	# The latter operates on the root filesystem directly here as it is basically a non FUSE operation
 	def initDB(self):
 		self.sha1db = Sha1DB(self.database)
 		
 		if (self.rescan):
-			# we'll operate on the root filesystem here as this is basically a non FUSE operation
+			# vacuum nonexistent files
+			self.sha1db.vacuum()
+			# now add new files
 			for root, dirs, files in os.walk(self.root):
 				for name in files:
 					self.sha1db.updateChecksum(join(root, name))
@@ -395,8 +399,7 @@ class Sha1FS(Xmp):
 		If it is a blocking read, just block until ready.
 		"""
 		with ewrap("read"):
-			logging.debug("read: %s (size %s, offset %s, fh %s)"
-					% (path, size, offset, fh))
+			logging.debug("read: %s (size %s, offset %s, fh %s)" % (path, size, offset, fh))
 			fh.seek(offset)
 			return fh.read(size)
 		
