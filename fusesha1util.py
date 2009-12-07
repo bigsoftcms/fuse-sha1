@@ -7,6 +7,11 @@ import hashlib
 #    See the file COPYING.
 #
 
+import logging
+
+LOG_FILENAME = "LOG"
+logging.basicConfig(filename=LOG_FILENAME,level=logging.INFO,)
+
 def sha1sum(fobj):
 	'''Returns a SHA1 hash for an object with read() method.'''
 	m = hashlib.sha1()
