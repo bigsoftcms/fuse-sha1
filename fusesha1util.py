@@ -14,9 +14,12 @@ logging.basicConfig(filename=LOG_FILENAME,level=logging.INFO,)
 
 def sha1sum(fobj):
 	'''Returns a SHA1 hash for an object with read() method.'''
+	kb = 1024
+	chunksize = 100 * kb
+
 	m = hashlib.sha1()
 	while True:
-		d = fobj.read(1024)
+		d = fobj.read(chunksize)
 		if not d:
 			break
 		m.update(d)
