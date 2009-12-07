@@ -17,6 +17,7 @@
 #
 
 import os, sys
+from os.path import join
 from errno import *
 from stat import *
 import fcntl
@@ -63,11 +64,24 @@ class Sha1FS(Xmp):
 													 dest = "database",
 													 help = "location of SQLite checksum database (required)",
 													 metavar="DATABASE")
+		self.parser.add_option("--rescan",
+													 action = "store_true",
+													 dest = "rescan",
+													 default = False,
+													 help = "(Re)calculate checksums at mount time.")
+		
+		# Initialize so we can look for this option even if the user didn't specify it
+		self.rescan = False
 		
 	# Initializes the database for this class
 	def initDB(self):
-		opts, args = self.cmdline
-		self.sha1db = Sha1DB(opts.database)
+		self.sha1db = Sha1DB(self.database)
+		
+		if (self.rescan):
+			# we'll operate on the root filesystem here as this is basically a non FUSE operation
+			for root, dirs, files in os.walk(self.root):
+				for name in files:
+					self.sha1db.updateChecksum(join(root, name))
 
 	def getattr(self, path):
 		"""
@@ -110,9 +124,9 @@ class Sha1FS(Xmp):
 	def unlink(self, path):
 		"""Deletes a file."""
 		with ewrap("unlink"):
-			logging.info("unlink: %s" % path)
+			logging.debug("unlink: %s" % path)
 			Xmp.unlink(self, path)
-			self.sha1db.removeChecksum("." + path)
+			self.sha1db.removeChecksum(self.root + path)
 
 	def rmdir(self, path):
 		"""Deletes a directory."""
@@ -449,9 +463,9 @@ class Sha1FS(Xmp):
 		flags: The same flags the file was opened with (see open).
 		"""
 		with ewrap("release"):
-			logging.info("release: %s (flags %s, fh %s)" % (path, oct(flags), fh))
+			logging.debug("release: %s (flags %s, fh %s)" % (path, oct(flags), fh))
 			fh.close()
-			self.sha1db.updateChecksum("." + path)
+			self.sha1db.updateChecksum(self.root + path)
 		
 	def fsync(self, path, datasync, fh=None):
 		"""
@@ -481,16 +495,14 @@ Userspace SHA1 checksum FS: mirror the filesystem tree, adding and updating file
 									dash_s_do='setsingle')
 
 	server.parse(values=server, errex=1)
-	server.initDB()
-	opts, args = server.cmdline
 	
-	database = opts.database
-	
-	if database == None:
+	if not server.parser.has_option("--database"):
 		server.parser.print_help()
 		# how do I make this an arg?
 		print "Error: Missing SQLite database argument."
 		sys.exit()
+		
+	server.initDB()
 
 	try:
 		if server.fuse_args.mount_expected():
