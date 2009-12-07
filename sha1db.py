@@ -21,11 +21,11 @@ class Sha1DB:
 	# this is a no-op.
 	def __init__(self, database):
 		self.database = database
-		logging.info("Sha1DB initialized with connection string %s" % database)
 
 		dbExists = os.path.exists(database)
 		
 		if not dbExists:
+			logging.info("Sha1DB initialized with connection string %s" % database)
 			self._execSql("""create table if not exists files(
 path varchar not null primary key,
 chksum varchar not null);""")
