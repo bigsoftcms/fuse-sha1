@@ -9,7 +9,7 @@
 # Docstring, several other comments, and much general understanding taken from templatefs.py 
 # by Matt Giuca (https://code.launchpad.net/~mgiuca/fuse-python-docs/trunk).
 #
-# Copyright (C) 2009 Chris Bouzek  <coldfusion78@gmail.com>
+# Copyright (C) 2009 Chris Bouzek  <bouzekc@gmail.com>
 #
 #
 #    This program can be distributed under the terms of the GNU LGPL.
