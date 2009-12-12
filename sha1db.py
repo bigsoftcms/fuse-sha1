@@ -18,8 +18,7 @@ LOG_FILENAME = "LOG"
 logging.basicConfig(filename=LOG_FILENAME,level=logging.INFO,)
 		
 class Sha1DB:
-	# Initializes the database given by the constructor parameter database. If it already exists, 
-	# this is a no-op.
+	# Creates a new Sha1DB.  If the database given does not exist, it will be created.
 	def __init__(self, database):
 		self.database = database
 
@@ -35,7 +34,10 @@ chksum varchar not null);""")
 		""" Moves duplicate entries (based on checksum) into the dupdir.  Uses the entry's path to 
 		reconstruct a subdirectory hierarchy in dupdir.  This will remove any common prefixes
 		between dupdir and the file path itself so as to make a useful subdirectory structure."""
-		logging.info("De-duping database")
+		logging.debug("De-duping database")
+	
+		if not len(os.listdir(dupdir)) <= 0:
+			raise Exception("%s is not empty; refusing to move files" % dupdir)
 		pathmap = {}
 		with sqlite.connect(self.database) as connection:
 			cursor = None
