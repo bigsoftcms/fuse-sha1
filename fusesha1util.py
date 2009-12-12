@@ -37,7 +37,8 @@ def moveFile(path, dstdir):
 	newpath = os.path.join(dstdir, newpath)
 	newparent = os.path.dirname(newpath)
 	if not os.path.exists(newparent): os.makedirs(newparent)
-	if not os.path.exists(newpath): os.rename(path, newpath)
+	logging.info("Moving %s to %s" % (path, newpath))
+	os.rename(path, newpath)
 	
 	oldparent = os.path.dirname(path)
 	if len(os.listdir(oldparent)) <= 0:
