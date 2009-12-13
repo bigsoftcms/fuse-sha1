@@ -9,7 +9,7 @@
 
 import os
 import logging
-from fusesha1util import sha1sum, moveFile, sqliteConn
+from fusesha1util import sha1sum, moveFile, sqliteConn, symlinkFile
 
 from optparse import OptionParser
 
@@ -27,12 +27,16 @@ class Sha1DB:
 			logging.info("Sha1DB initialized with connection string %s" % database)
 			self._execSql("""create table if not exists files(
 path varchar not null primary key,
-chksum varchar not null);""")
+chksum varchar not null,
+symlink boolean default 0);""")
 			
-	def dedup(self, dupdir):
+	def dedup(self, dupdir, doSymlink):
 		""" Moves duplicate entries (based on checksum) into the dupdir.  Uses the entry's path to 
 		reconstruct a subdirectory hierarchy in dupdir.  This will remove any common prefixes
-		between dupdir and the file path itself so as to make a useful subdirectory structure."""
+		between dupdir and the file path itself so as to make a useful subdirectory structure.
+		If doSymlink is true, then the original paths of the files that were moved will be symlinked 
+		back to the canonical file; in addition, it will keep the file entry in the database rather than
+		removing it."""
 		logging.debug("De-duping database")
 	
 		if os.path.exists(dupdir) and not len(os.listdir(dupdir)) <= 0:
@@ -44,7 +48,7 @@ chksum varchar not null);""")
 			with sqliteConn(self.database) as cursor:
 				cursor.execute("""select chksum, path from files where chksum in(
 	select chksum from files group by chksum 
-	having count(chksum) > 1) order by chksum;""")
+	having count(chksum) > 1) and symlink = 0 order by chksum;""")
 				while(1):
 					entry = cursor.fetchone()
 					if entry == None: break
@@ -56,10 +60,15 @@ chksum varchar not null);""")
 					
 			with sqliteConn(self.database) as cursor:
 				for chksum, paths in pathmap.iteritems():
+					canonicalPath = paths[0]
 					del paths[0] # we want to keep one file, so keep the first
 					for path in paths:
-						moveFile(path, dupdir)
-						cursor.execute("delete from files where path = ?;", (path, ))
+						moveFile(path, dupdir, (not doSymlink)) # don't rm empty dirs if we are symlinking
+						if not doSymlink:
+							cursor.execute("delete from files where path = ?;", (path, ))
+						else:
+							cursor.execute("update files set symlink = 1 where path = ?;", (path, ))
+							symlinkFile(canonicalPath, path)
 
 		except Exception as einst:
 			logging.error("Unable to de-dup database: %s" % einst)
@@ -124,6 +133,12 @@ def main():
 	 								  dest = "dupdir",
 	 								  help = "Move duplicates into DUPDIR",
 	 								  metavar="DUPDIR")
+	
+	parser.add_option("--symlink",
+										action = "store_true",
+										dest = "doSymlink",
+										default = False,
+										help = "Symlinks original paths for duplicates after moving them during --dedup.")
 
 	(options, args) = parser.parse_args()
 	
@@ -137,7 +152,7 @@ def main():
 	
 	if None != options.dupdir:
 		sha1db = Sha1DB(database)
-		sha1db.dedup(options.dupdir)
+		sha1db.dedup(options.dupdir, options.doSymlink)
 	
 
 if __name__ == '__main__':
