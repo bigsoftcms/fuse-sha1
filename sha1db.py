@@ -45,10 +45,14 @@ symlink boolean default 0);""")
 		try:
 			pathmap = {} # store duplicate paths keyed by file checksum
 			
+			extra = ""
+			if doSymlink:
+				extra = "and symlink = 0"
+			
 			with sqliteConn(self.database) as cursor:
 				cursor.execute("""select chksum, path from files where chksum in(
-	select chksum from files group by chksum 
-	having count(chksum) > 1) and symlink = 0 order by chksum;""")
+select chksum from files group by chksum 
+having count(chksum) > 1) %s order by chksum;""" % extra)
 				while(1):
 					entry = cursor.fetchone()
 					if entry == None: break
