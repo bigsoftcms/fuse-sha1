@@ -10,6 +10,9 @@ import hashlib
 import logging
 import os
 
+from contextlib import contextmanager
+from pysqlite2 import dbapi2 as sqlite
+
 LOG_FILENAME = "LOG"
 logging.basicConfig(filename=LOG_FILENAME,level=logging.INFO,)
 
@@ -43,7 +46,26 @@ def moveFile(path, dstdir):
 	oldparent = os.path.dirname(path)
 	if len(os.listdir(oldparent)) <= 0:
 		os.rmdir(oldparent)
-	
+		
+@contextmanager
+def sqliteConn(database):
+	"""Opens an SQLite connection to the given database file and provides a cursor that can be used 
+for operations on that SQLite connection.  The connection and cursor will always be closed, any 
+exceptions trapped at this level will be reraised, and the connection will be committed if the SQL 
+op succeeds or rolled back if it does not.  Can be used with the Python 'with' keyword."""
+	with sqlite.connect(database) as connection:
+		cursor = None
+		try:
+			# return the cursor
+			yield connection.cursor()
+		except:
+			if connection != None: connection.rollback()
+			raise
+		else:
+			connection.commit()
+		finally:
+			if cursor != None: cursor.close()
+
 # Wraps a code block so that if an exception occurs, it is logged
 class ewrap:
 	def __init__(self, funcName):
