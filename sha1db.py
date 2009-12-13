@@ -9,12 +9,17 @@
 
 import os
 import logging
-from fusesha1util import sha1sum, moveFile, sqliteConn, symlinkFile
+from fusesha1util import sha1sum, moveFile, sqliteConn, symlinkFile, isLink
 
 from optparse import OptionParser
 
 LOG_FILENAME = "LOG"
 logging.basicConfig(filename=LOG_FILENAME,level=logging.INFO,)
+CHECKSUM_UPDATE = "insert or replace into files(path, chksum, symlink) values(?, ?, ?);"
+
+#create the arguments needed for a checksum update
+def _makeUpdateArgs(path):
+	return (path, sha1sum(path), isLink(path))
 		
 class Sha1DB:
 	# Creates a new Sha1DB.  If the database given does not exist, it will be created.
@@ -105,13 +110,23 @@ having count(chksum) > 1) %s order by chksum;""" % extra)
 	def updateChecksum(self, path):
 		""" Update/insert checksums for a given path.  If the path points at a symlink, the entry will 
 		be marked as being a symlink."""
-		
-		isLink = 0
-		if os.path.islink(path): isLink = 1
-		
-		with open(path, 'rb') as f:
-			chksum = sha1sum(f)
-			self._execSql("insert or replace into files(path, chksum, symlink) values(?, ?, ?);", (path, chksum, isLink))
+		self._execSql(CHECKSUM_UPDATE, _makeUpdateArgs(path))
+			
+	def updateAllChecksums(self, fsroot):
+		""" Update/insert checksums for all of the files located under fsroot.  This is meant as an
+		optimization for rescanning the database, as it uses a single connection and transaction."""
+		with sqliteConn(self.database) as cursor:
+			try:
+				for root, dirs, files in os.walk(fsroot):
+					for name in files:
+						path = os.path.join(root, name)
+						if os.path.exists(path):
+							cursor.execute(CHECKSUM_UPDATE, _makeUpdateArgs(path))
+						else:
+							logging.error("Path %s does not exist; skipping update" % path)
+			except Exception as einst:
+				logging.error("Unable to update checksum for %s: %s" % (path, einst))
+				raise
 	
 	def removeChecksum(self, path):
 		""" Remove the checksum/path entry for the given path from the database """

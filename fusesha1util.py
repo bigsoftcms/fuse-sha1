@@ -16,18 +16,19 @@ from pysqlite2 import dbapi2 as sqlite
 LOG_FILENAME = "LOG"
 logging.basicConfig(filename=LOG_FILENAME,level=logging.INFO,)
 
-def sha1sum(fobj):
-	'''Returns a SHA1 hash for an object with read() method.'''
-	kb = 1024
-	chunksize = 100 * kb
-
-	m = hashlib.sha1()
-	while True:
-		d = fobj.read(chunksize)
-		if not d:
-			break
-		m.update(d)
-	return m.hexdigest()
+def sha1sum(path):
+	'''Returns a SHA1 hash for the file located at the given path.'''
+	with open(path, 'rb') as fobj:
+		kb = 1024
+		chunksize = 100 * kb
+	
+		m = hashlib.sha1()
+		while True:
+			d = fobj.read(chunksize)
+			if not d:
+				break
+			m.update(d)
+		return m.hexdigest()
 	
 def moveFile(path, dstdir, rmEmptyDirs = True):
 	"""Moves the file with the given path to the dstdir, removing any common prefixes between path 
@@ -60,6 +61,11 @@ def symlinkFile(target, link):
 	if not os.path.exists(newparent): os.makedirs(newparent)
 	logging.info("Symlinking %s to %s" % (newtarget, newlink))
 	os.symlink(newtarget, newlink)
+	
+def isLink(path):
+	""" Returns 1 if the given path is a symlink, 0 otherwise """
+	if os.path.islink(path): return 1
+	return 0
 		
 @contextmanager
 def sqliteConn(database):
