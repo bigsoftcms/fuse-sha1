@@ -9,9 +9,8 @@
 
 import os
 import logging
-from fusesha1util import sha1sum, moveFile
+from fusesha1util import sha1sum, moveFile, sqliteConn
 
-from pysqlite2 import dbapi2 as sqlite
 from optparse import OptionParser
 
 LOG_FILENAME = "LOG"
@@ -36,83 +35,59 @@ chksum varchar not null);""")
 		between dupdir and the file path itself so as to make a useful subdirectory structure."""
 		logging.debug("De-duping database")
 	
-		if not len(os.listdir(dupdir)) <= 0:
+		if os.path.exists(dupdir) and not len(os.listdir(dupdir)) <= 0:
 			raise Exception("%s is not empty; refusing to move files" % dupdir)
-		pathmap = {}
-		with sqlite.connect(self.database) as connection:
-			cursor = None
-			try:
-				cursor = connection.cursor()
+			
+		try:
+			pathmap = {} # store duplicate paths keyed by file checksum
+			
+			with sqliteConn(self.database) as cursor:
 				cursor.execute("""select chksum, path from files where chksum in(
-select chksum from files group by chksum 
-having count(chksum) > 1) order by chksum;""")
+	select chksum from files group by chksum 
+	having count(chksum) > 1) order by chksum;""")
 				while(1):
 					entry = cursor.fetchone()
-					
 					if entry == None: break
 					
-					#
 					(chksum, path) = entry
-					if not chksum in pathmap:
-						pathmap[chksum] = []
+					if not chksum in pathmap: pathmap[chksum] = [] # ensure existence of list for checksum
 					paths = pathmap[chksum]
 					paths.append(path)
 					
-				cursor.close()
-				
-				cursor = connection.cursor()
+			with sqliteConn(self.database) as cursor:
 				for chksum, paths in pathmap.iteritems():
-					del paths[0]
+					del paths[0] # we want to keep one file, so keep the first
 					for path in paths:
 						moveFile(path, dupdir)
 						cursor.execute("delete from files where path = ?;", (path, ))
-				cursor.close()
-				#
-			except Exception as einst:
-				logging.error("Unable to de-dup database: %s" % einst)
-				if connection != None: connection.rollback()
-				raise
-			else:
-				connection.commit()
-			finally:
-				if cursor != None: cursor.close()
+
+		except Exception as einst:
+			logging.error("Unable to de-dup database: %s" % einst)
+			raise
 		
 	def vacuum(self):
 		""" Check the paths in the database, removing entries for which no actual file exists """
 		logging.info("Vacuuming database")
-		with sqlite.connect(self.database) as connection:
-			querycursor = None
-			cursor = None
-			try:
-				querycursor = connection.cursor()
-				try:
-					cursor = connection.cursor()
-					querycursor.execute("select path from files;")
-					while(1):
-						entry = querycursor.fetchone()
-						if entry == None: break
-						
-						#
-						(path, ) = entry
+		
+		try:
+			paths = [] # store nonexistent paths
+			with sqliteConn(self.database) as cursor:
+				cursor.execute("select path from files;")
+				while(1):
+					entry = cursor.fetchone()
+					if entry == None: break
+					(path, ) = entry
+					paths.append(path)
 					
+			if len(paths) > 0:
+				with sqliteConn(self.database) as cursor:
+					for path in paths:
 						if not os.path.exists(path):
 							logging.info("Removing entry for %s; file does not exist" % path)
 							cursor.execute("delete from files where path = ?;", (path, ))
-							
-						#
-							
-					querycursor.close()
-					cursor.close()
-				except Exception as einst:
-					logging.error("Unable to vacuum database: %s" % einst)
-					if connection != None: connection.rollback()
-					raise
-				else:
-					connection.commit()
-				finally:
-					if cursor != None: cursor.close()
-			finally:
-				if querycursor != None: querycursor.close()
+		except Exception as einst:
+			logging.error("Unable to vacuum database: %s" % einst)
+			raise
 
 	def updateChecksum(self, path):
 		""" Update/insert checksums for a given path """
@@ -133,26 +108,14 @@ having count(chksum) > 1) order by chksum;""")
 	def _execSql(self, sql, sqlargs = None):
 		sql = self._formatSql(sql)
 		logging.debug("Running SQL %s with args %s" % (sql, sqlargs))
-		with sqlite.connect(self.database) as connection:
-			cursor = None
+		
+		with sqliteConn(self.database) as cursor:
 			try:
-				cursor = connection.cursor()
-				
-				#
-				if sqlargs != None:
-					cursor.execute(sql, sqlargs)
-				else:
-					cursor.execute(sql)
-				#
-				
-				cursor.close()
+				if sqlargs != None: cursor.execute(sql, sqlargs)
+				else: cursor.execute(sql)
 			except Exception as einst:
 				logging.error("Unable to exec %s with args: %s" % (sql, sqlargs, einst))
-				if connection != None: connection.rollback()
-			else:
-				connection.commit()
-			finally:
-				if cursor != None: cursor.close()
+				raise
 				
 def main():
 	usage = """%prog perform operations on the FUSE SHA1 filesystem database.  [options] database."""
