@@ -103,10 +103,15 @@ having count(chksum) > 1) %s order by chksum;""" % extra)
 			raise
 
 	def updateChecksum(self, path):
-		""" Update/insert checksums for a given path """
+		""" Update/insert checksums for a given path.  If the path points at a symlink, the entry will 
+		be marked as being a symlink."""
+		
+		isLink = 0
+		if os.path.islink(path): isLink = 1
+		
 		with open(path, 'rb') as f:
 			chksum = sha1sum(f)
-			self._execSql("insert or replace into files(path, chksum) values(?, ?);", (path, chksum))
+			self._execSql("insert or replace into files(path, chksum, symlink) values(?, ?, ?);", (path, chksum, isLink))
 	
 	def removeChecksum(self, path):
 		""" Remove the checksum/path entry for the given path from the database """
