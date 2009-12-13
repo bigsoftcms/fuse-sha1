@@ -504,11 +504,10 @@ Userspace SHA1 checksum FS: mirror the filesystem tree, adding and updating file
 		# how do I make this an arg?
 		print "Error: Missing SQLite database argument."
 		sys.exit()
-		
-	server.initDB()
 
 	try:
 		if server.fuse_args.mount_expected():
+			server.initDB()
 			os.chdir(server.root)
 	except OSError:
 		print >> sys.stderr, "can't enter root of underlying filesystem"
