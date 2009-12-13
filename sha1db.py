@@ -148,6 +148,12 @@ def main():
 										dest = "doSymlink",
 										default = False,
 										help = "Symlinks original paths for duplicates after moving them during --dedup.")
+	
+	parser.add_option("--vacuum",
+								 		action = "store_true",
+										dest = "vacuum",
+										default = False,
+										help = "Remove entries for nonexistent files")
 
 	(options, args) = parser.parse_args()
 	
@@ -158,10 +164,14 @@ def main():
 	
 	if not os.path.exists(database):
 		parser.error("%s does not exist" % database)
+		
+	sha1db = Sha1DB(database)
 	
 	if None != options.dupdir:
-		sha1db = Sha1DB(database)
 		sha1db.dedup(options.dupdir, options.doSymlink)
+		
+	if None != options.vacuum:
+		sha1db.vacuum()
 	
 
 if __name__ == '__main__':

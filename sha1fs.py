@@ -70,18 +70,10 @@ class Sha1FS(Xmp):
 													 default = False,
 													 help = "(Re)calculate checksums at mount time.")
 		
-		self.parser.add_option("--vacuum",
-													 action = "store_true",
-													 dest = "vacuum",
-													 default = False,
-													 help = "Remove entries for nonexistent files")
-		
 		# Initialize so we can look for this option even if the user didn't specify it
 		self.rescan = False
-		self.vacuum = False
 		
-	# Initializes the database for this class.  If rescan is enabled, this will vacuum the DB
-	# (ie remove nonexistent paths) and will scan for new/updated files
+	# Initializes the database for this class.  If rescan is enabled, this will scan for new/updated files
 	# The latter operates on the root filesystem directly here as it is basically a non FUSE operation
 	def initDB(self):
 		self.sha1db = Sha1DB(self.database)
@@ -91,10 +83,6 @@ class Sha1FS(Xmp):
 			for root, dirs, files in os.walk(self.root):
 				for name in files:
 					self.sha1db.updateChecksum(join(root, name))
-					
-		if (self.vacuum):
-			# vacuum nonexistent files
-			self.sha1db.vacuum()
 
 	def getattr(self, path):
 		"""

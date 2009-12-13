@@ -64,6 +64,15 @@ Note that --rescan can be used anytime you want.  It simply runs an insert or up
 then removes any entries for which the path does not exist.  It can be time consuming with a large
 filesystem, which is why it is not on by default.
 
+== Handling nonexistent files ==
+
+If you need to remove nonexistent files (e.g. if you deleted files from the root without going through
+the mirrored filesystem) just add run sha1db.py with --vacuum, e.g.
+
+python sha1db.py /home/user/mysqlitedb.db --vacuum
+
+This will scan the database at and remove any entries for which the file does not exist.
+
 == Handling duplicates ==
 
 One thing that I like to do is clean out duplicates for a directory.  The FUSE tools don't have an
