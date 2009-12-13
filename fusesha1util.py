@@ -29,9 +29,11 @@ def sha1sum(fobj):
 		m.update(d)
 	return m.hexdigest()
 	
-def moveFile(path, dstdir):
+def moveFile(path, dstdir, rmEmptyDirs = True):
 	"""Moves the file with the given path to the dstdir, removing any common prefixes between path 
-	and dstdir.  After moving, this will remove the parent directory for path if it is empty."""
+	and dstdir.  if rmEmptyDirs is true, then this will remove the parent directory for path after the 
+	file move if the directory is empty.
+	"""
 	newpath = os.path.abspath(path)
 	dstdir = os.path.abspath(dstdir)
 	# remove any common prefixes so that we can create a directory structure
@@ -46,6 +48,18 @@ def moveFile(path, dstdir):
 	oldparent = os.path.dirname(path)
 	if len(os.listdir(oldparent)) <= 0:
 		os.rmdir(oldparent)
+		
+def symlinkFile(target, link):
+	"""Moves the file with the given path to the dstdir, removing any common prefixes between path 
+	and dstdir.  After moving, this will remove the parent directory for path if it is empty.
+	"""
+	newtarget = os.path.abspath(target)
+	newlink = os.path.abspath(link)
+
+	newparent = os.path.dirname(newlink)
+	if not os.path.exists(newparent): os.makedirs(newparent)
+	logging.info("Symlinking %s to %s" % (newtarget, newlink))
+	os.symlink(newtarget, newlink)
 		
 @contextmanager
 def sqliteConn(database):
