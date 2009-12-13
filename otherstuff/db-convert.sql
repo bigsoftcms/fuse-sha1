@@ -3,13 +3,15 @@
 begin transaction;
 create temporary table files_backup(
   path varchar not null primary key,
-  chksum varchar not null);
-insert into files_backup select path, chksum from files;
+  chksum varchar not null,
+  symlink boolean default 0);
+insert into files_backup select path, chksum, 0 from files;
 drop table files;
 create table files(
   path varchar not null primary key,
-  chksum varchar not null);
-insert into files select path, chksum from files_backup;
+  chksum varchar not null,
+  symlink boolean default 0);
+insert into files select path, chksum, symlink from files_backup;
 drop table files_backup;
 commit;
 vacuum;
