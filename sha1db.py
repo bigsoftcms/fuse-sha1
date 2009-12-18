@@ -51,9 +51,11 @@ symlink boolean default 0);""")
 			pathmap = {} # store duplicate paths keyed by file checksum
 			
 			with sqliteConn(self.database) as cursor:
-				cursor.execute("""select chksum, path from files where chksum in(
-select chksum from files group by chksum 
-having count(chksum) > 1) and symlink = 0 order by chksum;""")
+				cursor.execute("""select chksum, path from files 
+where chksum in(
+select chksum from files where symlink = 0 group by chksum having count(chksum) > 1) 
+and symlink = 0 
+order by chksum, path;""")
 				while(1):
 					entry = cursor.fetchone()
 					if entry == None: break
@@ -65,8 +67,13 @@ having count(chksum) > 1) and symlink = 0 order by chksum;""")
 					
 			with sqliteConn(self.database) as cursor:
 				for chksum, paths in pathmap.iteritems():
+					# the query above will result in single rows for symlinked files, so fix that here
+					# rather than mucking about with temp tables
+					paths = filter(lambda path: not os.path.islink(path), paths)
+					
 					canonicalPath = paths[0]
 					del paths[0] # we want to keep one file, so keep the first
+					
 					for path in paths:
 						moveFile(path, dupdir, (not doSymlink)) # don't rm empty dirs if we are symlinking
 						if not doSymlink:
