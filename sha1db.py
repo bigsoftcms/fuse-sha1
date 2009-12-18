@@ -50,14 +50,10 @@ symlink boolean default 0);""")
 		try:
 			pathmap = {} # store duplicate paths keyed by file checksum
 			
-			extra = ""
-			if doSymlink:
-				extra = "and symlink = 0"
-			
 			with sqliteConn(self.database) as cursor:
 				cursor.execute("""select chksum, path from files where chksum in(
 select chksum from files group by chksum 
-having count(chksum) > 1) %s order by chksum;""" % extra)
+having count(chksum) > 1) and symlink = 0 order by chksum;""")
 				while(1):
 					entry = cursor.fetchone()
 					if entry == None: break
@@ -95,14 +91,15 @@ having count(chksum) > 1) %s order by chksum;""" % extra)
 					entry = cursor.fetchone()
 					if entry == None: break
 					(path, ) = entry
-					paths.append(path)
+					
+					if not os.path.exists(path): paths.append(path)
 					
 			if len(paths) > 0:
 				with sqliteConn(self.database) as cursor:
 					for path in paths:
-						if not os.path.exists(path):
-							logging.info("Removing entry for %s; file does not exist" % path)
-							cursor.execute("delete from files where path = ?;", (path, ))
+						logging.info("Removing entry for %s; file does not exist" % path)
+						cursor.execute("delete from files where path = ?;", (path, ))
+			logging.info("Vacuum complete")
 		except Exception as einst:
 			logging.error("Unable to vacuum database: %s" % einst)
 			raise
@@ -113,6 +110,7 @@ having count(chksum) > 1) %s order by chksum;""" % extra)
 		self._execSql(CHECKSUM_UPDATE, _makeUpdateArgs(path))
 			
 	def updateAllChecksums(self, fsroot):
+		logging.info("Updating all checksums under %s" % fsroot)
 		""" Update/insert checksums for all of the files located under fsroot.  This is meant as an
 		optimization for rescanning the database, as it uses a single connection and transaction."""
 		with sqliteConn(self.database) as cursor:
@@ -177,16 +175,14 @@ def main():
 	
 	database = args[0]
 	
-	if not os.path.exists(database):
-		parser.error("%s does not exist" % database)
+	if not os.path.exists(database): parser.error("%s does not exist" % database)
 		
 	sha1db = Sha1DB(database)
 	
-	if None != options.dupdir:
-		sha1db.dedup(options.dupdir, options.doSymlink)
-		
-	if None != options.vacuum:
-		sha1db.vacuum()
+	# vacuum first, then dedup
+	if options.vacuum: sha1db.vacuum()
+	
+	if None != options.dupdir: sha1db.dedup(options.dupdir, options.doSymlink)
 	
 
 if __name__ == '__main__':
