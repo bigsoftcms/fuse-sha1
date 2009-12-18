@@ -39,7 +39,11 @@ def moveFile(path, dstdir, rmEmptyDirs = True):
 	dstdir = os.path.abspath(dstdir)
 	# remove any common prefixes so that we can create a directory structure
 	prefix = os.path.commonprefix([dstdir, newpath])
+	
 	if len(prefix) > 1: newpath = newpath.replace(prefix, '', 1)
+	else:
+		raise IOError("Cannot move %s to %s as they are on different filesystems" % (path, dstdir))
+	
 	newpath = os.path.join(dstdir, newpath)
 	newparent = os.path.dirname(newpath)
 	if not os.path.exists(newparent): os.makedirs(newparent)
