@@ -42,7 +42,7 @@ symlink boolean default 0);""")
 		If doSymlink is true, then the original paths of the files that were moved will be symlinked 
 		back to the canonical file; in addition, it will keep the file entry in the database rather than
 		removing it."""
-		logging.debug("De-duping database")
+		logging.info("De-duping database")
 	
 		if os.path.exists(dupdir) and not len(os.listdir(dupdir)) <= 0:
 			raise Exception("%s is not empty; refusing to move files" % dupdir)
@@ -81,7 +81,7 @@ order by chksum, path;""")
 						else:
 							cursor.execute("update files set symlink = 1 where path = ?;", (path, ))
 							symlinkFile(canonicalPath, path)
-
+			logging.info("De-duping complete")
 		except Exception as einst:
 			logging.error("Unable to de-dup database: %s" % einst)
 			raise
