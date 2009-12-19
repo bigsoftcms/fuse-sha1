@@ -68,6 +68,7 @@ order by chksum, path;""")
 					# rather than mucking about with temp tables
 					paths = filter(lambda path: not os.path.islink(path), paths)
 					
+					# we'll have at least two elements due to the inner part of the query above
 					canonicalPath = paths[0]
 					del paths[0] # we want to keep one file, so keep the first
 					
@@ -155,8 +156,15 @@ order by chksum, path;""")
 				(link, ) = row
 				if os.stat(link).st_ino != pathInode:
 					links.append(link) # only hardlink files that don't point at the same inode
-					
-			for link in links: linkFile(path, link)
+			
+			if len(links) > 0:
+				# let's assume that an existing entry is newer than this one.  Otherwise, we are constantly
+				# relinking files
+				canonicalLink = links[0]
+				del links[0]
+				linkFile(canonicalLink, path)
+				# now clean up any remaining links with different inodes
+				for link in links: linkFile(canonicalLink, link)
 		
 	# Makes sure the SQL statement has a "; at the end"
 	def _formatSql(self, sql):
