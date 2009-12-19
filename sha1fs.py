@@ -93,7 +93,7 @@ class Sha1FS(Xmp):
 				logging.debug("getattr: %s" % path)
 				return Xmp.getattr(self, path)
 			else:
-				logging.info("Skipping getattr for nonexistent path %s" % path)
+				logging.debug("Skipping getattr for nonexistent path %s" % path)
 				return -ENOENT
 
 	def readlink(self, path):
