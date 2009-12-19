@@ -29,42 +29,58 @@ def sha1sum(path):
 				break
 			m.update(d)
 		return m.hexdigest()
+ 
+def safeMakedirs(path):
+	"""Checks the parent of the path (via dirname) and makes sure it exists by calling os.makedirs.
+	Returns the parent directory name."""
+	parent = os.path.dirname(path)
+	if not os.path.exists(parent): os.makedirs(parent)
+	return parent
 	
-def moveFile(path, dstdir, rmEmptyDirs = True):
-	"""Moves the file with the given path to the dstdir, removing any common prefixes between path 
-	and dstdir.  if rmEmptyDirs is true, then this will remove the parent directory for path after the 
-	file move if the directory is empty.
-	"""
-	newpath = os.path.abspath(path)
+def safeUnlink(path):
+	"""Checks that path exists and if so, unlinks it"""
+	if os.path.exists(path): os.unlink(path)
+	
+def dstWithSubdirectory(src, dstdir):
+	"""Returns a destination filename that includes the subdirectory structure that is not common
+	to both src and dstdir.  This can be used to determine where to move a file including
+	subdirectories."""
+	absSrc = os.path.abspath(src)
 	dstdir = os.path.abspath(dstdir)
-	# remove any common prefixes so that we can create a directory structure
-	prefix = os.path.commonprefix([dstdir, newpath])
+	# remove any common prefixes so that we can create a subdirectory structure
+	prefix = os.path.commonprefix([dstdir, absSrc])
+	return os.path.join(dstdir, absSrc.replace(prefix, '', 1))
 	
-	if len(prefix) > 1: newpath = newpath.replace(prefix, '', 1)
-	else:
-		raise IOError("Cannot move %s to %s as they are on different filesystems" % (path, dstdir))
+def moveFile(src, dst, rmEmptyDirs = True):
+	"""Moves the file at src to the dstdir, removing any common prefixes between src 
+	and dstdir.  if rmEmptyDirs is true, then this will remove the parent directory for src after the 
+	file move if the directory is empty."""	
+	safeMakedirs(dst)
 	
-	newpath = os.path.join(dstdir, newpath)
-	newparent = os.path.dirname(newpath)
-	if not os.path.exists(newparent): os.makedirs(newparent)
-	logging.info("Moving %s to %s" % (path, newpath))
-	os.rename(path, newpath)
+	logging.info("Moving %s to %s" % (src, dst))
+	os.rename(src, dst)
 	
-	oldparent = os.path.dirname(path)
-	if len(os.listdir(oldparent)) <= 0:
-		os.rmdir(oldparent)
+	oldparent = os.path.dirname(src)
+	if len(os.listdir(oldparent)) <= 0: os.rmdir(oldparent)
 		
 def symlinkFile(target, link):
-	"""Moves the file with the given path to the dstdir, removing any common prefixes between path 
-	and dstdir.  After moving, this will remove the parent directory for path if it is empty.
+	"""Symlink link to target."""
+	absTarget = os.path.abspath(target)
+	absLink = os.path.abspath(link)
+	safeMakedirs(absLink)
+	safeUnlink(absLink)
+	logging.info("Symlinking %s to %s" % (absLink, absTarget))
+	os.symlink(absTarget, absLink)
+	
+def linkFile(target, link):
+	"""Creates a hard link from link to target.  Both must be on the same filesystem.
 	"""
-	newtarget = os.path.abspath(target)
-	newlink = os.path.abspath(link)
-
-	newparent = os.path.dirname(newlink)
-	if not os.path.exists(newparent): os.makedirs(newparent)
-	logging.info("Symlinking %s to %s" % (newtarget, newlink))
-	os.symlink(newtarget, newlink)
+	absTarget = os.path.abspath(target)
+	absLink = os.path.abspath(link)
+	safeMakedirs(absLink)
+	safeUnlink(absLink)
+	logging.info("Linking %s to %s" % (absLink, absTarget))
+	os.link(absTarget, absLink)
 	
 def isLink(path):
 	""" Returns 1 if the given path is a symlink, 0 otherwise """

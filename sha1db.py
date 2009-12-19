@@ -9,7 +9,7 @@
 
 import os
 import logging
-from fusesha1util import sha1sum, moveFile, sqliteConn, symlinkFile, isLink
+from fusesha1util import sha1sum, moveFile, sqliteConn, symlinkFile, isLink, dstWithSubdirectory
 
 from optparse import OptionParser
 
@@ -65,7 +65,6 @@ order by chksum, path;""")
 					paths = pathmap[chksum]
 					paths.append(path)
 					
-			with sqliteConn(self.database) as cursor:
 				for chksum, paths in pathmap.iteritems():
 					# the query above will result in single rows for symlinked files, so fix that here
 					# rather than mucking about with temp tables
@@ -75,7 +74,8 @@ order by chksum, path;""")
 					del paths[0] # we want to keep one file, so keep the first
 					
 					for path in paths:
-						moveFile(path, dupdir, (not doSymlink)) # don't rm empty dirs if we are symlinking
+						dst = dstWithSubdirectory(path, dupdir)
+						moveFile(path, dst, (not doSymlink)) # don't rm empty dirs if we are symlinking
 						if not doSymlink:
 							cursor.execute("delete from files where path = ?;", (path, ))
 						else:
