@@ -49,11 +49,8 @@ symlink boolean default 0);""")
 					(chksum, path))
 				
 				# i.e. find all different files with the same checksum
-				while(1):
-					entry = cursor.fetchone()
-					if entry == None: break
-					(link, ) = entry
-					
+				for row in cursor:
+					(link, ) = row
 					if os.stat(link).st_ino != pathInode:
 						links.append(link) # only hardlink files that don't point at the same inode
 					
@@ -85,11 +82,8 @@ where chksum in(
 select chksum from files where symlink = 0 group by chksum having count(chksum) > 1) 
 and symlink = 0 
 order by chksum, path;""")
-				while(1):
-					entry = cursor.fetchone()
-					if entry == None: break
-					
-					(chksum, path) = entry
+				for row in cursor:
+					(chksum, path) = row
 					if not chksum in pathmap: pathmap[chksum] = [] # ensure existence of list for checksum
 					paths = pathmap[chksum]
 					paths.append(path)
@@ -123,19 +117,15 @@ order by chksum, path;""")
 			paths = [] # store nonexistent paths
 			with sqliteConn(self.database) as cursor:
 				cursor.execute("select path from files;")
-				while(1):
-					entry = cursor.fetchone()
-					if entry == None: break
-					(path, ) = entry
-					
+				for row in cursor:
+					(path, ) = row
 					if not os.path.exists(path): paths.append(path)
 					
-			if len(paths) > 0:
-				with sqliteConn(self.database) as cursor:
+				if len(paths) > 0:
 					for path in paths:
 						logging.info("Removing entry for %s; file does not exist" % path)
 						cursor.execute("delete from files where path = ?;", (path, ))
-			logging.info("Vacuum complete")
+				logging.info("Vacuum complete")
 		except Exception as einst:
 			logging.error("Unable to vacuum database: %s" % einst)
 			raise
@@ -167,12 +157,12 @@ order by chksum, path;""")
 	def removeChecksum(self, path):
 		""" Remove the checksum/path entry for the given path from the database """
 		self._execSql("delete from files where path = ?;", (path, ))
-						
+		
 	# Makes sure the SQL statement has a "; at the end"
 	def _formatSql(self, sql):
 		if not sql.endswith(";"): sql = sql + ";"
 		return sql
-		
+
 	# internal method used to run arbitrary SQL on the SQLite database
 	def _execSql(self, sql, sqlargs = None):
 		sql = self._formatSql(sql)
