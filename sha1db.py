@@ -181,7 +181,7 @@ order by chksum, path;""")
 				if sqlargs != None: cursor.execute(sql, sqlargs)
 				else: cursor.execute(sql)
 		except Exception as einst:
-			logging.error("Unable to exec %s with args: %s" % (sql, sqlargs, einst))
+			logging.error("Unable to exec %s with args %s: %s" % (sql, sqlargs, einst))
 			raise
 				
 def main():
