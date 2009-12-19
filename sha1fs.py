@@ -89,8 +89,12 @@ class Sha1FS(Xmp):
 		errno code if another error occurs.
 		"""
 		with ewrap("getattr"):
-			logging.debug("getattr: %s" % path)
-			return Xmp.getattr(self, path)
+			if os.path.exists("." + path):
+				logging.debug("getattr: %s" % path)
+				return Xmp.getattr(self, path)
+			else:
+				logging.info("Skipping getattr for nonexistent path %s" % path)
+				return -ENOENT
 
 	def readlink(self, path):
 		"""
