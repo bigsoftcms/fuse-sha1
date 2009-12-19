@@ -9,7 +9,7 @@
 
 import os
 import logging
-from fusesha1util import sha1sum, moveFile, sqliteConn, symlinkFile, isLink, dstWithSubdirectory
+from fusesha1util import sha1sum, moveFile, sqliteConn, symlinkFile, isLink, linkFile, dstWithSubdirectory
 
 from optparse import OptionParser
 
@@ -34,6 +34,35 @@ class Sha1DB:
 path varchar not null primary key,
 chksum varchar not null,
 symlink boolean default 0);""")
+			
+	def hardlinkDup(self, path, chksum):
+		"""Scans existing DB entries for entries that have the same checksum but not the same 
+		path and inode and turns those other entries into hardlinks."""
+		logging.debug("Checking for hardlink candidates for %s" % path)
+
+		links = []
+		try:
+			pathInode = os.stat(path).st_ino
+			
+			with sqliteConn(self.database) as cursor:
+				cursor.execute("select path from files where chksum = ? and path != ? and symlink = 0", 
+					(chksum, path))
+				
+				# i.e. find all different files with the same checksum
+				while(1):
+					entry = cursor.fetchone()
+					if entry == None: break
+					(link, ) = entry
+					
+					if os.stat(link).st_ino != pathInode:
+						links.append(link) # only hardlink files that don't point at the same inode
+					
+			for link in links: linkFile(path, link)
+
+			logging.debug("Hardlink check complete")
+		except Exception as einst:
+			logging.error("Unable to hardlink %s: %s" % (path, einst))
+			raise
 			
 	def dedup(self, dupdir, doSymlink):
 		""" Moves duplicate entries (based on checksum) into the dupdir.  Uses the entry's path to 
@@ -114,7 +143,9 @@ order by chksum, path;""")
 	def updateChecksum(self, path):
 		""" Update/insert checksums for a given path.  If the path points at a symlink, the entry will 
 		be marked as being a symlink."""
-		self._execSql(CHECKSUM_UPDATE, _makeUpdateArgs(path))
+		(path, chksum, isLink) = _makeUpdateArgs(path)
+		self._execSql(CHECKSUM_UPDATE, (path, chksum, isLink))
+		self.hardlinkDup(path, chksum)
 			
 	def updateAllChecksums(self, fsroot):
 		logging.info("Updating all checksums under %s" % fsroot)
