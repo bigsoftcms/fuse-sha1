@@ -73,14 +73,16 @@ def symlinkFile(target, link):
 	os.symlink(absTarget, absLink)
 	
 def linkFile(target, link):
-	"""Creates a hard link from link to target.  Both must be on the same filesystem.
+	"""Creates a hard link from link to target.  Both must be on the same filesystem.  If both
+	target and link have the same inode, this is a no-op.
 	"""
-	absTarget = os.path.abspath(target)
-	absLink = os.path.abspath(link)
-	safeMakedirs(absLink)
-	safeUnlink(absLink)
-	logging.info("Linking %s to %s" % (absLink, absTarget))
-	os.link(absTarget, absLink)
+	if os.stat(target).st_ino != os.stat(link).st_ino:
+		absTarget = os.path.abspath(target)
+		absLink = os.path.abspath(link)
+		safeMakedirs(absLink)
+		safeUnlink(absLink)
+		logging.info("Linking %s to %s" % (absLink, absTarget))
+		os.link(absTarget, absLink)
 	
 def isLink(path):
 	""" Returns 1 if the given path is a symlink, 0 otherwise """
