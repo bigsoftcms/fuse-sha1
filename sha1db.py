@@ -16,6 +16,7 @@ from optparse import OptionParser
 LOG_FILENAME = "LOG"
 logging.basicConfig(filename=LOG_FILENAME,level=logging.INFO,)
 CHECKSUM_UPDATE = "insert or replace into files(path, chksum, symlink) values(?, ?, ?);"
+REMOVE_ROW = "delete from files where path = ?;"
 
 #create the arguments needed for a checksum update
 def _makeUpdateArgs(path):
@@ -34,32 +35,6 @@ class Sha1DB:
 path varchar not null primary key,
 chksum varchar not null,
 symlink boolean default 0);""")
-			
-	def hardlinkDup(self, path, chksum):
-		"""Scans existing DB entries for entries that have the same checksum but not the same 
-		path and inode and turns those other entries into hardlinks."""
-		logging.debug("Checking for hardlink candidates for %s" % path)
-
-		links = []
-		try:
-			pathInode = os.stat(path).st_ino
-			
-			with sqliteConn(self.database) as cursor:
-				cursor.execute("select path from files where chksum = ? and path != ? and symlink = 0", 
-					(chksum, path))
-				
-				# i.e. find all different files with the same checksum
-				for row in cursor:
-					(link, ) = row
-					if os.stat(link).st_ino != pathInode:
-						links.append(link) # only hardlink files that don't point at the same inode
-					
-			for link in links: linkFile(path, link)
-
-			logging.debug("Hardlink check complete")
-		except Exception as einst:
-			logging.error("Unable to hardlink %s: %s" % (path, einst))
-			raise
 			
 	def dedup(self, dupdir, doSymlink):
 		""" Moves duplicate entries (based on checksum) into the dupdir.  Uses the entry's path to 
@@ -100,7 +75,7 @@ order by chksum, path;""")
 						dst = dstWithSubdirectory(path, dupdir)
 						moveFile(path, dst, (not doSymlink)) # don't rm empty dirs if we are symlinking
 						if not doSymlink:
-							cursor.execute("delete from files where path = ?;", (path, ))
+							cursor.execute(REMOVE_ROW, (path, ))
 						else:
 							cursor.execute("update files set symlink = 1 where path = ?;", (path, ))
 							symlinkFile(canonicalPath, path)
@@ -121,10 +96,9 @@ order by chksum, path;""")
 					(path, ) = row
 					if not os.path.exists(path): paths.append(path)
 					
-				if len(paths) > 0:
-					for path in paths:
-						logging.info("Removing entry for %s; file does not exist" % path)
-						cursor.execute("delete from files where path = ?;", (path, ))
+				for path in paths:
+					logging.info("Removing entry for %s; file does not exist" % path)
+					cursor.execute("delete from files where path = ?;", (path, ))
 				logging.info("Vacuum complete")
 		except Exception as einst:
 			logging.error("Unable to vacuum database: %s" % einst)
@@ -134,8 +108,13 @@ order by chksum, path;""")
 		""" Update/insert checksums for a given path.  If the path points at a symlink, the entry will 
 		be marked as being a symlink."""
 		(path, chksum, isLink) = _makeUpdateArgs(path)
-		self._execSql(CHECKSUM_UPDATE, (path, chksum, isLink))
-		self.hardlinkDup(path, chksum)
+		try:
+			with sqliteConn(self.database) as cursor:
+				cursor.execute(CHECKSUM_UPDATE, (path, chksum, isLink))
+				self._hardlinkDup(path, chksum, cursor)
+		except Exception as einst:
+			logging.error("Unable to exec %s with args: %s" % (sql, sqlargs, einst))
+			raise
 			
 	def updateAllChecksums(self, fsroot):
 		logging.info("Updating all checksums under %s" % fsroot)
@@ -147,8 +126,11 @@ order by chksum, path;""")
 					for name in files:
 						path = os.path.join(root, name)
 						if os.path.exists(path):
-							cursor.execute(CHECKSUM_UPDATE, _makeUpdateArgs(path))
+							(path, chksum, isLink) = _makeUpdateArgs(path)
+							cursor.execute(CHECKSUM_UPDATE, (path, chksum, isLink))
+							self._hardlinkDup(path, chksum, cursor)
 						else:
+							# this happens for broken symlinks
 							logging.error("Path %s does not exist; skipping update" % path)
 			except Exception as einst:
 				logging.error("Unable to update checksum for %s: %s" % (path, einst))
@@ -156,7 +138,25 @@ order by chksum, path;""")
 	
 	def removeChecksum(self, path):
 		""" Remove the checksum/path entry for the given path from the database """
-		self._execSql("delete from files where path = ?;", (path, ))
+		self._execSql(REMOVE_ROW, (path, ))
+		
+	# internal helper to link a path using an existing cursor.  This is in some sense an
+	# antipattern method, but I really don't want to deal with this as a duplicated code
+	# block.  Note that this will skip any paths given to it that are symlinks
+	def _hardlinkDup(self, path, chksum, cursor):
+		if not isLink(path):
+			pathInode = os.stat(path).st_ino
+			links = []
+			cursor.execute("select path from files where chksum = ? and path != ? and symlink = 0;", 
+						(chksum, path))
+					
+			# i.e. find all different files with the same checksum
+			for row in cursor:
+				(link, ) = row
+				if os.stat(link).st_ino != pathInode:
+					links.append(link) # only hardlink files that don't point at the same inode
+					
+			for link in links: linkFile(path, link)
 		
 	# Makes sure the SQL statement has a "; at the end"
 	def _formatSql(self, sql):
@@ -168,13 +168,13 @@ order by chksum, path;""")
 		sql = self._formatSql(sql)
 		logging.debug("Running SQL %s with args %s" % (sql, sqlargs))
 		
-		with sqliteConn(self.database) as cursor:
-			try:
+		try:
+			with sqliteConn(self.database) as cursor:
 				if sqlargs != None: cursor.execute(sql, sqlargs)
 				else: cursor.execute(sql)
-			except Exception as einst:
-				logging.error("Unable to exec %s with args: %s" % (sql, sqlargs, einst))
-				raise
+		except Exception as einst:
+			logging.error("Unable to exec %s with args: %s" % (sql, sqlargs, einst))
+			raise
 				
 def main():
 	usage = """%prog perform operations on the FUSE SHA1 filesystem database.  [options] database."""
