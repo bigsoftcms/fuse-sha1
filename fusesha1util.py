@@ -114,6 +114,6 @@ class ewrap:
 		self.funcName = funcName
 	def __enter__(self):
 		return self.funcName
-	def __exit__(self, type, value, traceback):
-		if not value is None:
+	def __exit__(self, type, value, trace):
+		if None != value:
 			logging.error("!! Exception in %s: %s" % (self.funcName, value))
