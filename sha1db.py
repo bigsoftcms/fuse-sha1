@@ -9,7 +9,7 @@
 
 import os
 import logging
-from fusesha1util import sha1sum, moveFile, sqliteConn, symlinkFile, isLink, linkFile, dstWithSubdirectory
+from fusesha1util import sha1sum, moveFile, sqliteConn, symlinkFile, isLinkAsNum, linkFile, dstWithSubdirectory
 
 from optparse import OptionParser
 
@@ -20,7 +20,7 @@ REMOVE_ROW = "delete from files where path = ?;"
 
 #create the arguments needed for a checksum update
 def _makeUpdateArgs(path):
-	return (path, sha1sum(path), isLink(path))
+	return (path, sha1sum(path), isLinkAsNum(path))
 		
 class Sha1DB:
 	# Creates a new Sha1DB.  If the database given does not exist, it will be created.
@@ -145,7 +145,7 @@ order by chksum, path;""")
 	# antipattern method, but I really don't want to deal with this as a duplicated code
 	# block.  Note that this will skip any paths given to it that are symlinks
 	def _hardlinkDup(self, path, chksum, cursor):
-		if not isLink(path):
+		if not os.path.islink(path):
 			pathInode = os.stat(path).st_ino
 			links = []
 			cursor.execute("select path from files where chksum = ? and path != ? and symlink = 0;", 

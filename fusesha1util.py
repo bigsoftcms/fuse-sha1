@@ -43,6 +43,8 @@ def safeMakedirs(path):
 	
 def safeUnlink(path):
 	"""Checks that path exists and if so, unlinks it"""
+	if None == path:
+		raise OSError("safeUnlink requires a path to be specified")
 	if os.path.exists(path): os.unlink(path)
 	
 def dstWithSubdirectory(src, dstdir):
@@ -88,7 +90,7 @@ def linkFile(target, link):
 		logging.info("Linking %s to %s" % (absLink, absTarget))
 		os.link(absTarget, absLink)
 	
-def isLink(path):
+def isLinkAsNum(path):
 	""" Returns 1 if the given path is a symlink, 0 otherwise """
 	if os.path.islink(path): return 1
 	return 0
