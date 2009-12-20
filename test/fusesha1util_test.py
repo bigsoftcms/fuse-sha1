@@ -30,5 +30,19 @@ class TestSha1FuseUtil(unittest.TestCase):
 		self.assertRaises(OSError, lambda: fsu.safeMakedirs(""))
 		self.assertRaises(OSError, lambda: fsu.safeMakedirs(None))
 		
+	def testSafeUnlink(self):
+		fsu.safeUnlink("")
+		self.assertRaises(OSError, lambda: fsu.safeUnlink(None))
+		
+		testfile = "unlinktest.txt"
+		if os.path.exists(testfile): os.unlink(testfile)
+		self.assertFalse(os.path.exists(testfile))
+		
+		with open(testfile, 'w') as f:
+			f.write("test text")
+		self.assertTrue(os.path.exists(testfile))
+		fsu.safeUnlink(testfile)
+		self.assertFalse(os.path.exists(testfile))
+		
 if __name__ == '__main__':
 	unittest.main()
