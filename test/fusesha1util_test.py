@@ -19,6 +19,8 @@ class TestSha1FuseUtil(unittest.TestCase):
 		self.assertRaises(OSError, lambda: fsu.linkFile("", ""))
 		self.assertRaises(OSError, lambda: fsu.linkFile(None, ""))
 		self.assertRaises(OSError, lambda: fsu.linkFile("", None))
+		self.assertRaises(OSError, lambda: fsu.linkFile(self._sha1file, ""))
+		self.assertRaises(OSError, lambda: fsu.linkFile(self._sha1file, None))
 		
 	def testLinkFile(self):
 		link = "sha1hardlink.txt"
@@ -37,6 +39,8 @@ class TestSha1FuseUtil(unittest.TestCase):
 		self.assertRaises(OSError, lambda: fsu.symlinkFile("", ""))
 		self.assertRaises(OSError, lambda: fsu.symlinkFile(None, ""))
 		self.assertRaises(OSError, lambda: fsu.symlinkFile("", None))
+		self.assertRaises(OSError, lambda: fsu.symlinkFile(self._sha1file, ""))
+		self.assertRaises(OSError, lambda: fsu.symlinkFile(self._sha1file, None))
 		
 	def testSymlinkFile(self):
 		link = "sha1link.txt"

@@ -74,6 +74,9 @@ def symlinkFile(target, link):
 	if (None == target) or (not os.path.exists(target)):
 		raise OSError("symlinkFile requires a target to be specified")
 		
+	if (None == link) or ("" == link):
+		raise OSError("symlinkFile requires a link path to be specified")
+		
 	absTarget = os.path.abspath(target)
 	absLink = os.path.abspath(link)
 	safeMakedirs(absLink)
@@ -87,6 +90,9 @@ def linkFile(target, link):
 	"""
 	if (None == target) or (not os.path.exists(target)):
 		raise OSError("linkFile requires a target to be specified")
+		
+	if (None == link) or ("" == link):
+		raise OSError("linkFile requires a link path to be specified")
 		
 	sameFile = os.path.exists(link)
 	if sameFile: sameFile = (os.stat(target).st_ino == os.stat(link).st_ino)
