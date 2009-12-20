@@ -108,13 +108,15 @@ order by chksum, path;""")
 	def updateChecksum(self, path):
 		""" Update/insert checksums for a given path.  If the path points at a symlink, the entry will 
 		be marked as being a symlink."""
-		(path, chksum, isLink) = _makeUpdateArgs(path)
+		logging.info("Adding %s" % path)
+		sqlargs = _makeUpdateArgs(path)
+		(path, chksum, isLink) = sqlargs
 		try:
 			with sqliteConn(self.database) as cursor:
-				cursor.execute(CHECKSUM_UPDATE, (path, chksum, isLink))
+				cursor.execute(CHECKSUM_UPDATE, sqlargs)
 				self._hardlinkDup(path, chksum, cursor)
 		except Exception as einst:
-			logging.error("Unable to exec %s with args: %s" % (sql, sqlargs, einst))
+			logging.error("Unable to update checksum for %s: %s" % (path, einst))
 			raise
 			
 	def updateAllChecksums(self, fsroot):
