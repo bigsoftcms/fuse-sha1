@@ -31,8 +31,8 @@ class TestSha1FuseUtil(unittest.TestCase):
 		
 		self.assertEqual("/media/cdrom/usr/local/test.txt",
 			fsu.dstWithSubdirectory("/usr/local/test.txt", "/media/cdrom"))
-		self.assertEqual("/media/cdrom/subdir/test.txt",
-			fsu.dstWithSubdirectory("/media/cdrom/test.txt", "/media/cdrom/subdir"))
+		self.assertEqual("/media/cdrom/subdir/othersubdir/test.txt",
+			fsu.dstWithSubdirectory("/media/cdrom/othersubdir/test.txt", "/media/cdrom/subdir"))
 	
 	# Test the variations on sha1sum
 	def testSha1Sum(self):
