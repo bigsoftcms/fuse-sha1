@@ -51,10 +51,19 @@ def dstWithSubdirectory(src, dstdir):
 	"""Returns a destination filename that includes the subdirectory structure that is not common
 	to both src and dstdir.  This can be used to determine where to move a file including
 	subdirectories."""
+	if (None == src) or ("" == src):
+		raise IOError("dstWithSubdirectory requires src to be specified")
+		
+	if (None == dstdir) or ("" == dstdir):
+		raise IOError("dstWithSubdirectory requires dstdir to be specified")
+		
 	absSrc = os.path.abspath(src)
 	dstdir = os.path.abspath(dstdir)
 	# remove any common prefixes so that we can create a subdirectory structure
 	prefix = os.path.commonprefix([dstdir, absSrc])
+	
+	if not prefix.endswith("/"): prefix = prefix + "/"
+	
 	return os.path.join(dstdir, absSrc.replace(prefix, '', 1))
 	
 def moveFile(src, dst, rmEmptyDirs = True):
