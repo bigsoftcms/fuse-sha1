@@ -8,6 +8,24 @@ import fusesha1util as fsu
 class TestSha1FuseUtil(unittest.TestCase):
 	_sha1file = "sha1test.txt"
 	
+	def testDstWithSubdirectoryBad(self):
+		self.assertRaises(IOError, lambda: fsu.dstWithSubdirectory("", ""))
+		self.assertRaises(IOError, lambda: fsu.dstWithSubdirectory("", None))
+		self.assertRaises(IOError, lambda: fsu.dstWithSubdirectory("", "subdir"))
+		
+		self.assertRaises(IOError, lambda: fsu.dstWithSubdirectory(None, None))
+		self.assertRaises(IOError, lambda: fsu.dstWithSubdirectory(None, ""))
+		
+		self.assertRaises(IOError, lambda: fsu.dstWithSubdirectory("uouoeuoaeuu", ""))
+		
+		self.assertRaises(IOError, lambda: fsu.dstWithSubdirectory(self._sha1file, ""))
+		self.assertRaises(IOError, lambda: fsu.dstWithSubdirectory(self._sha1file, None))
+	
+	def testDstWithSubdirectory(self):
+		newdst = os.path.join(os.path.dirname(os.path.abspath(self._sha1file)), "newsubdir")
+		expected = "/home/belisarius/github/fuse-sha1/test/newsubdir/subdir/file.txt"
+		self.assertEqual(expected, fsu.dstWithSubdirectory("subdir/file.txt", newdst))
+	
 	# Test the variations on sha1sum
 	def testSha1Sum(self):
 		self.assertRaises(IOError, lambda: fsu.sha1sum(""))
