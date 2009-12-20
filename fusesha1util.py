@@ -82,7 +82,10 @@ def linkFile(target, link):
 	"""Creates a hard link from link to target.  Both must be on the same filesystem.  If both
 	target and link have the same inode, this is a no-op.
 	"""
-	if os.stat(target).st_ino != os.stat(link).st_ino:
+	sameFile = os.path.exists(link)
+	if sameFile: sameFile = (os.stat(target).st_ino == os.stat(link).st_ino)
+	
+	if not sameFile:
 		absTarget = os.path.abspath(target)
 		absLink = os.path.abspath(link)
 		safeMakedirs(absLink)

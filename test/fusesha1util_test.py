@@ -6,11 +6,50 @@ import os
 import fusesha1util as fsu
 
 class TestSha1FuseUtil(unittest.TestCase):
+	_sha1file = "sha1test.txt"
+	
 	# Test the variations on sha1sum
 	def testSha1Sum(self):
-		self.assertEqual("9519b846c2b3a933bd348cc983f3796180ad2761", fsu.sha1sum("sha1test.txt"))
 		self.assertRaises(IOError, lambda: fsu.sha1sum(""))
 		self.assertRaises(IOError, lambda: fsu.sha1sum(None))
+		self.assertEqual("9519b846c2b3a933bd348cc983f3796180ad2761", fsu.sha1sum(self._sha1file))
+		
+	def testLinkFile(self):
+		link = "sha1hardlink.txt"
+		fsu.linkFile(self._sha1file, link)
+		
+		self.assertLink(link)
+		
+		# link again, just to make sure it won't fail
+		fsu.linkFile(self._sha1file, link)
+		
+		self.assertLink(link)
+		self.assertUnlinked(link)
+		
+	# make a symlink and try to hardlink to it
+	def testLinkSymlink(self):
+		link = "sha1link.txt"
+		fsu.symlinkFile(self._sha1file, link)
+		
+		self.assertSymlink(link)
+		
+		# try to hard link link; this should be a no-op
+		fsu.linkFile(self._sha1file, link)
+		
+		self.assertSymlink(link)
+		self.assertUnlinked(link)
+		
+	def testSymlinkFile(self):
+		link = "sha1link.txt"
+		fsu.symlinkFile(self._sha1file, link)
+		
+		self.assertSymlink(link)
+		
+		# link again, just to make sure it won't fail
+		fsu.symlinkFile(self._sha1file, link)
+		
+		self.assertSymlink(link)
+		self.assertUnlinked(link)
 		
 	def testSafeMakeDirs(self):
 		parent = "testdirnoexist"
@@ -43,6 +82,20 @@ class TestSha1FuseUtil(unittest.TestCase):
 		self.assertTrue(os.path.exists(testfile))
 		fsu.safeUnlink(testfile)
 		self.assertFalse(os.path.exists(testfile))
+		
+	def assertSymlink(self, link):
+		self.assertTrue(os.path.exists(link))
+		self.assertTrue(os.path.islink(link))
+		self.assertEquals(os.stat(self._sha1file).st_ino, os.stat(link).st_ino)
+		
+	def assertLink(self, link):
+		self.assertTrue(os.path.exists(link))
+		self.assertFalse(os.path.islink(link))
+		self.assertEquals(os.stat(self._sha1file).st_ino, os.stat(link).st_ino)
+	
+	def assertUnlinked(self, link):
+		fsu.safeUnlink(link)
+		self.assertFalse(os.path.exists(link))
 		
 if __name__ == '__main__':
 	unittest.main()
