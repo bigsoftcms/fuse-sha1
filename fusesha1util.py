@@ -18,6 +18,8 @@ logging.basicConfig(filename=LOG_FILENAME,level=logging.INFO,)
 
 def sha1sum(path):
 	'''Returns a SHA1 hash for the file located at the given path.'''
+	if None == path:
+		raise IOError("sha1sum requires a path to be specified")
 	with open(path, 'rb') as fobj:
 		kb = 1024
 		chunksize = 100 * kb
@@ -33,6 +35,8 @@ def sha1sum(path):
 def safeMakedirs(path):
 	"""Checks the parent of the path (via dirname) and makes sure it exists by calling os.makedirs.
 	Returns the parent directory name."""
+	if None == path:
+		raise OSError("safeMakedirs requires a path to be specified")
 	parent = os.path.dirname(path)
 	if not os.path.exists(parent): os.makedirs(parent)
 	return parent
