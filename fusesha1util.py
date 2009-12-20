@@ -63,8 +63,12 @@ def dstWithSubdirectory(src, dstdir):
 	prefix = os.path.commonprefix([dstdir, absSrc])
 	
 	if not prefix.endswith("/"): prefix = prefix + "/"
+	newdst = os.path.join(dstdir, absSrc.replace(prefix, '', 1))
 	
-	return os.path.join(dstdir, absSrc.replace(prefix, '', 1))
+	if newdst == absSrc:
+		raise IOError("Unable to determine new destination; %s and %s are the same path" % (newdst, absSrc))
+	
+	return newdst
 	
 def moveFile(src, dst, rmEmptyDirs = True):
 	"""Moves the file at src to the dstdir, removing any common prefixes between src 

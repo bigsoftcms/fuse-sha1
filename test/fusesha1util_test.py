@@ -20,11 +20,19 @@ class TestSha1FuseUtil(unittest.TestCase):
 		
 		self.assertRaises(IOError, lambda: fsu.dstWithSubdirectory(self._sha1file, ""))
 		self.assertRaises(IOError, lambda: fsu.dstWithSubdirectory(self._sha1file, None))
+		
+		self.assertRaises(IOError, 
+			lambda: fsu.dstWithSubdirectory("/media/cdrom/test.txt", "/media/cdrom"))
 	
 	def testDstWithSubdirectory(self):
 		newdst = os.path.join(os.path.dirname(os.path.abspath(self._sha1file)), "newsubdir")
 		expected = "/home/belisarius/github/fuse-sha1/test/newsubdir/subdir/file.txt"
 		self.assertEqual(expected, fsu.dstWithSubdirectory("subdir/file.txt", newdst))
+		
+		self.assertEqual("/media/cdrom/usr/local/test.txt",
+			fsu.dstWithSubdirectory("/usr/local/test.txt", "/media/cdrom"))
+		self.assertEqual("/media/cdrom/subdir/test.txt",
+			fsu.dstWithSubdirectory("/media/cdrom/test.txt", "/media/cdrom/subdir"))
 	
 	# Test the variations on sha1sum
 	def testSha1Sum(self):
