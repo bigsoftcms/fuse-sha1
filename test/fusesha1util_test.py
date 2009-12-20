@@ -14,6 +14,12 @@ class TestSha1FuseUtil(unittest.TestCase):
 		self.assertRaises(IOError, lambda: fsu.sha1sum(None))
 		self.assertEqual("9519b846c2b3a933bd348cc983f3796180ad2761", fsu.sha1sum(self._sha1file))
 		
+	def testLinkFileBad(self):
+		self.assertRaises(OSError, lambda: fsu.linkFile(None, None))
+		self.assertRaises(OSError, lambda: fsu.linkFile("", ""))
+		self.assertRaises(OSError, lambda: fsu.linkFile(None, ""))
+		self.assertRaises(OSError, lambda: fsu.linkFile("", None))
+		
 	def testLinkFile(self):
 		link = "sha1hardlink.txt"
 		fsu.linkFile(self._sha1file, link)
@@ -26,18 +32,11 @@ class TestSha1FuseUtil(unittest.TestCase):
 		self.assertLink(link)
 		self.assertUnlinked(link)
 		
-	# make a symlink and try to hardlink to it
-	def testLinkSymlink(self):
-		link = "sha1link.txt"
-		fsu.symlinkFile(self._sha1file, link)
-		
-		self.assertSymlink(link)
-		
-		# try to hard link link; this should be a no-op
-		fsu.linkFile(self._sha1file, link)
-		
-		self.assertSymlink(link)
-		self.assertUnlinked(link)
+	def testSymlinkFileBad(self):
+		self.assertRaises(OSError, lambda: fsu.symlinkFile(None, None))
+		self.assertRaises(OSError, lambda: fsu.symlinkFile("", ""))
+		self.assertRaises(OSError, lambda: fsu.symlinkFile(None, ""))
+		self.assertRaises(OSError, lambda: fsu.symlinkFile("", None))
 		
 	def testSymlinkFile(self):
 		link = "sha1link.txt"
@@ -47,6 +46,19 @@ class TestSha1FuseUtil(unittest.TestCase):
 		
 		# link again, just to make sure it won't fail
 		fsu.symlinkFile(self._sha1file, link)
+		
+		self.assertSymlink(link)
+		self.assertUnlinked(link)
+		
+	# make a symlink and try to hardlink to it
+	def testLinkSymlink(self):
+		link = "sha1link.txt"
+		fsu.symlinkFile(self._sha1file, link)
+		
+		self.assertSymlink(link)
+		
+		# try to hard link link; this should be a no-op
+		fsu.linkFile(self._sha1file, link)
 		
 		self.assertSymlink(link)
 		self.assertUnlinked(link)
