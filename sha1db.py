@@ -108,13 +108,9 @@ order by chksum, path;""")
 	def updateChecksum(self, path):
 		""" Update/insert checksums for a given path.  If the path points at a symlink, the entry will 
 		be marked as being a symlink."""
-		logging.info("Adding %s" % path)
-		sqlargs = _makeUpdateArgs(path)
-		(path, chksum, isLink) = sqlargs
 		try:
 			with sqliteConn(self.database) as cursor:
-				cursor.execute(CHECKSUM_UPDATE, sqlargs)
-				self._hardlinkDup(path, chksum, cursor)
+				self._updateChecksumAndLink(path, cursor)
 		except Exception as einst:
 			logging.error("Unable to update checksum for %s: %s" % (path, einst))
 			raise
@@ -128,13 +124,7 @@ order by chksum, path;""")
 				for root, dirs, files in os.walk(fsroot):
 					for name in files:
 						path = os.path.join(root, name)
-						if os.path.exists(path):
-							(path, chksum, isLink) = _makeUpdateArgs(path)
-							cursor.execute(CHECKSUM_UPDATE, (path, chksum, isLink))
-							self._hardlinkDup(path, chksum, cursor)
-						else:
-							# this happens for broken symlinks
-							logging.error("Path %s does not exist; skipping update" % path)
+						self._updateChecksumAndLink(path, cursor)
 			except Exception as einst:
 				logging.error("Unable to update checksum for %s: %s" % (path, einst))
 				raise
@@ -142,6 +132,18 @@ order by chksum, path;""")
 	def removeChecksum(self, path):
 		""" Remove the checksum/path entry for the given path from the database """
 		self._execSql(REMOVE_ROW, (path, ))
+		
+	# Calculates the checksum and link status for the given path, then updates the DB entry
+	# and creates a hard link if the file has the same checksum as another file
+	# If path is nonexistent, this will log an error
+	def _updateChecksumAndLink(self, path, cursor):
+		if os.path.exists(path):
+			(path, chksum, isLink) = _makeUpdateArgs(path)
+			cursor.execute(CHECKSUM_UPDATE, (path, chksum, isLink))
+			self._hardlinkDup(path, chksum, cursor)
+		else:
+			# this happens for broken symlinks
+			logging.error("Path %s does not exist; skipping update" % path)
 		
 	# internal helper to link a path using an existing cursor.  This is in some sense an
 	# antipattern method, but I really don't want to deal with this as a duplicated code
