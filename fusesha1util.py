@@ -129,7 +129,7 @@ def sqliteConn(database):
 for operations on that SQLite connection.  The connection and cursor will always be closed, any 
 exceptions trapped at this level will be reraised, and the connection will be committed if the SQL 
 op succeeds or rolled back if it does not.  Can be used with the Python 'with' keyword."""
-	with sqlite.connect(database) as connection:
+	with sqlite.connect(database, timeout=30.0) as connection:
 		cursor = None
 		try:
 			# return the cursor
