@@ -133,7 +133,8 @@ op succeeds or rolled back if it does not.  Can be used with the Python 'with' k
 		cursor = None
 		try:
 			# return the cursor
-			yield connection.cursor()
+			cursor = connection.cursor()
+			yield cursor
 		except:
 			if connection != None: connection.rollback()
 			raise
