@@ -124,10 +124,12 @@ order by chksum, path;""")
 				for root, dirs, files in os.walk(fsroot):
 					for name in files:
 						path = os.path.join(root, name)
+						logging.info("Updating %s" % path)
 						self._updateChecksumAndLink(path, cursor)
 			except Exception as einst:
 				logging.error("Unable to update checksum for %s: %s" % (path, einst))
 				raise
+		logging.info("Done updating all checksums")
 	
 	def removeChecksum(self, path):
 		""" Remove the checksum/path entry for the given path from the database """
