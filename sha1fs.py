@@ -170,12 +170,7 @@ class Sha1FS(Xmp):
 		with ewrap("rename"):
 			logging.debug("rename: target %s, name: %s" % (self.root + old, self.root + new))
 			Xmp.rename(self, old, new)
-
-			try:
-				self.sha1db.updatePath(self.root + old, self.root + new)
-				saved = True
-			except Exception as einst:
-				logging.error("Update failed; trying again")
+			self.sha1db.updatePath(self.root + old, self.root + new)
 
 	def link(self, target, name):
 		"""
@@ -469,15 +464,22 @@ class Sha1FS(Xmp):
 		flags: The same flags the file was opened with (see open).
 		"""
 		with ewrap("release"):
-			logging.info("release: %s (flags %s, fh %s)" % (path, oct(flags), fh))
+			logging.debug("release: %s (flags %s, fh %s)" % (path, oct(flags), fh))
 			fh.close()
-			saved = False
-			while (not saved):
-				try:
-					self.sha1db.updateChecksum(self.root + path)
-					saved = True
-				except Exception as einst:
-					logging.error("Update failed; trying again")
+			
+			if not self._blacklisted(path):
+				saved = False
+				count = 0
+				while (not saved and count < 5):
+					count += 1
+					try:
+						self.sha1db.updateChecksum(self.root + path)
+						saved = True
+					except Exception as einst:
+						logging.warn("Update failed; trying again")
+						
+				if not saved:
+					logging.error("Unable to update checksum; quitting")
 		
 	def fsync(self, path, datasync, fh=None):
 		"""
@@ -491,6 +493,10 @@ class Sha1FS(Xmp):
 				os.fdatasync(fh.fileno())
 			else:
 				os.fsync(fh.fileno())
+				
+	def _blacklisted(self, path):
+		"""Returns true if the path should not be kept in the checksum list."""
+		return path.find(".Trash") >= 0
 
 	def main(self, *a, **kw):
 		#self.file_class = self.Sha1File
