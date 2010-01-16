@@ -168,8 +168,14 @@ class Sha1FS(Xmp):
 		manually copy and delete the file, and this method will not be called.
 		"""
 		with ewrap("rename"):
-			logging.debug("rename: target %s, name: %s" % (old, new))
+			logging.debug("rename: target %s, name: %s" % (self.root + old, self.root + new))
 			Xmp.rename(self, old, new)
+
+			try:
+				self.sha1db.updatePath(self.root + old, self.root + new)
+				saved = True
+			except Exception as einst:
+				logging.error("Update failed; trying again")
 
 	def link(self, target, name):
 		"""
@@ -463,9 +469,15 @@ class Sha1FS(Xmp):
 		flags: The same flags the file was opened with (see open).
 		"""
 		with ewrap("release"):
-			logging.debug("release: %s (flags %s, fh %s)" % (path, oct(flags), fh))
+			logging.info("release: %s (flags %s, fh %s)" % (path, oct(flags), fh))
 			fh.close()
-			self.sha1db.updateChecksum(self.root + path)
+			saved = False
+			while (not saved):
+				try:
+					self.sha1db.updateChecksum(self.root + path)
+					saved = True
+				except Exception as einst:
+					logging.error("Update failed; trying again")
 		
 	def fsync(self, path, datasync, fh=None):
 		"""
