@@ -16,6 +16,8 @@ from optparse import OptionParser
 LOG_FILENAME = "LOG"
 logging.basicConfig(filename=LOG_FILENAME,level=logging.INFO,)
 CHECKSUM_UPDATE = "insert or replace into files(path, chksum, symlink) values(?, ?, ?);"
+# old path, new path, old path with %
+PATH_UPDATE = "update files set path = replace(path, ?, ?) where path like ?;"
 REMOVE_ROW = "delete from files where path = ?;"
 
 #create the arguments needed for a checksum update
@@ -113,6 +115,17 @@ order by chksum, path;""")
 				self._updateChecksumAndLink(path, cursor)
 		except Exception as einst:
 			logging.error("Unable to update checksum for %s: %s" % (path, einst))
+			raise
+			
+	def updatePath(self, old, new):
+		"""Updates the path in the database for a given file.  This is meant to be used by functions
+		like rename, which may use directories rather than individual files for renames, thus old and
+		new may be directories."""
+		try:
+			with sqliteConn(self.database) as cursor:
+				cursor.execute(PATH_UPDATE, (old, new, old + '%'))
+		except Exception as einst:
+			logging.error("Unable to update path for %s to %s: %s" % (old, new, einst))
 			raise
 			
 	def updateAllChecksums(self, fsroot):
