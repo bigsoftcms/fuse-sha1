@@ -16,13 +16,10 @@ from optparse import OptionParser
 LOG_FILENAME = "LOG"
 logging.basicConfig(filename=LOG_FILENAME,level=logging.INFO,)
 CHECKSUM_UPDATE = "insert or replace into files(path, chksum, symlink) values(?, ?, ?);"
+LINK_UPDATE = "update files set link = ? where path = ?;"
 # old path, new path, old path with %
 PATH_UPDATE = "update files set path = replace(path, ?, ?) where path like ?;"
 REMOVE_ROW = "delete from files where path = ?;"
-
-#create the arguments needed for a checksum update
-def _makeUpdateArgs(path):
-	return (path, sha1sum(path), isLinkAsNum(path))
 		
 class Sha1DB:
 	# Creates a new Sha1DB.  If the database given does not exist, it will be created.
@@ -54,13 +51,14 @@ symlink boolean default 0);""")
 			pathmap = {} # store duplicate paths keyed by file checksum
 			
 			with sqliteConn(self.database) as cursor:
-				cursor.execute("""select chksum, path from files 
+				cursor.execute("""select chksum, path, link from files 
 where chksum in(
 select chksum from files where symlink = 0 group by chksum having count(chksum) > 1) 
 and symlink = 0 
-order by chksum, path;""")
+and link = 1
+order by chksum, link;""")
 				for row in cursor:
-					(chksum, path) = row
+					(chksum, path, islink) = row
 					if not chksum in pathmap: pathmap[chksum] = [] # ensure existence of list for checksum
 					paths = pathmap[chksum]
 					paths.append(path)
@@ -71,10 +69,7 @@ order by chksum, path;""")
 					paths = filter(lambda path: not os.path.islink(path), paths)
 					
 					# we'll have at least two elements due to the inner part of the query above
-					canonicalPath = paths[0]
-					del paths[0] # we want to keep one file, so keep the first
-					
-					for path in paths:
+					for path in paths: 
 						dst = dstWithSubdirectory(path, dupdir)
 						moveFile(path, dst, (not doSymlink)) # don't rm empty dirs if we are symlinking
 						if not doSymlink:
@@ -153,8 +148,8 @@ order by chksum, path;""")
 	# If path is nonexistent, this will log an error
 	def _updateChecksumAndLink(self, path, cursor):
 		if os.path.exists(path):
-			(path, chksum, isLink) = _makeUpdateArgs(path)
-			cursor.execute(CHECKSUM_UPDATE, (path, chksum, isLink))
+			chksum = sha1sum(path)
+			cursor.execute(CHECKSUM_UPDATE, (path, chksum, isLinkAsNum(path)))
 			self._hardlinkDup(path, chksum, cursor)
 		else:
 			# this happens for broken symlinks
@@ -181,9 +176,12 @@ order by chksum, path;""")
 				# relinking files
 				canonicalLink = links[0]
 				del links[0]
-				linkFile(canonicalLink, path)
-				# now clean up any remaining links with different inodes
-				for link in links: linkFile(canonicalLink, link)
+				links.append(path)
+
+				# clean up any links with different inodes
+				for link in links:
+					cursor.execute(LINK_UPDATE, (1, link))
+					linkFile(canonicalLink, link)
 		
 	# Makes sure the SQL statement has a "; at the end"
 	def _formatSql(self, sql):
