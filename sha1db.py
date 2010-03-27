@@ -34,6 +34,7 @@ class Sha1DB:
 path varchar not null primary key,
 chksum varchar not null,
 symlink boolean default 0);""")
+			self._execSql("create index csum_idx on files(chksum);")
 			
 	def dedup(self, dupdir, doSymlink):
 		""" Moves duplicate entries (based on checksum) into the dupdir.  Uses the entry's path to 

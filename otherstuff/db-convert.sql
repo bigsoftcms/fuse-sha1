@@ -33,5 +33,6 @@ create table files(
   link boolean default 0);
 insert into files select path, chksum, symlink, link from files_backup;
 drop table files_backup;
+create index csum_idx on files(chksum);
 commit;
 vacuum;
