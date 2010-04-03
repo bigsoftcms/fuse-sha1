@@ -104,3 +104,6 @@ python sha1db.py /home/user/mysqlitedb.db --dedup /home/user/duplicates
 
 The dedup operation also logs the file moves to the LOG file mentioned at the beginning of this 
 readme.
+
+Note that symlinks are treated specially; they are not considered duplicates and thus will not
+be removed from the database nor the filesystem.
