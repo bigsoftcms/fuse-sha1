@@ -56,22 +56,12 @@ def flag2accessflag(flags):
 class Sha1FS(Xmp):
   def __init__(self, *args, **kw):
     Xmp.__init__(self, *args, **kw)
-    
-    self.parser.add_option(mountopt="root", metavar="PATH", default='/',
-      help="mirror filesystem from under PATH [default: %default]")
-    
-    self.parser.add_option("--database",
-                           dest = "database",
-                           help = "location of SQLite checksum database (required)",
-                           metavar="DATABASE")
-    self.parser.add_option("--rescan",
-                           action = "store_true",
-                           dest = "rescan",
-                           default = False,
-                           help = "(Re)calculate checksums at mount time.")
-    
+       
     # Initialize so we can look for this option even if the user didn't specify it
     self.rescan = False
+    # Null all the other options so we can correctly handle errors if they are missing
+    self.database = None
+    self.root = None
     
   # Initializes the database for this class.  If rescan is enabled, this will scan for new/updated files
   # The latter operates on the root filesystem directly here as it is basically a non FUSE operation
@@ -512,16 +502,39 @@ Userspace SHA1 checksum FS: mirror the filesystem tree, adding and updating file
                   usage=usage,
                   dash_s_do='setsingle')
 
-  server.parse(values=server, errex=1)
+  server.parser.add_option(mountopt="root", metavar="PATH", default='/',
+    help="mirror filesystem from under PATH [default: %default]")
   
-  if not server.parser.has_option("--database"):
+  server.parser.add_option("--database",
+                         dest = "database",
+                         help = "location of SQLite checksum database (required)",
+                         metavar="DATABASE")
+  server.parser.add_option("--rescan",
+                         action = "store_true",
+                         dest = "rescan",
+                         default = False,
+                         help = "(Re)calculate checksums at mount time.")
+
+
+  server.parse(values=server, errex=1)
+  if not server.fuse_args.mountpoint:
     server.parser.print_help()
-    # how do I make this an arg?
-    print "Error: Missing SQLite database argument."
-    sys.exit()
+    print >> sys.stderr, "Error: missing FUSE mountpoint."
+    sys.exit(2)
+
+  if not server.database:
+    server.parser.print_help()
+    print >> sys.stderr, "Error: Missing database argument."
+    sys.exit(2)
+
+  if not server.root:
+    server.parser.print_help()
+    print >> sys.stderr, "Error: Missing root filesystem."
+    sys.exit(2)
 
   try:
     if server.fuse_args.mount_expected():
+      #print "Mounting", server.root, "at", server.fuse_args.mountpoint
       server.initDB()
       os.chdir(server.root)
   except OSError:
