@@ -38,14 +38,16 @@ def safeMakedirs(path):
   if None == path:
     raise OSError("safeMakedirs requires a path to be specified")
   parent = os.path.dirname(path)
-  if not os.path.exists(parent): os.makedirs(parent)
+  if not os.path.exists(parent):
+    os.makedirs(parent)
   return parent
   
 def safeUnlink(path):
   """Checks that path exists and if so, unlinks it"""
   if None == path:
     raise OSError("safeUnlink requires a path to be specified")
-  if os.path.exists(path): os.unlink(path)
+  if os.path.exists(path):
+    os.unlink(path)
   
 def dstWithSubdirectory(src, dstdir):
   """Returns a destination filename that includes the subdirectory structure that is not common
@@ -62,7 +64,8 @@ def dstWithSubdirectory(src, dstdir):
   # remove any common prefixes so that we can create a subdirectory structure
   prefix = os.path.commonprefix([dstdir, absSrc])
   
-  if not prefix.endswith("/"): prefix = prefix + "/"
+  if not prefix.endswith("/"):
+    prefix = prefix + "/"
   newdst = os.path.join(dstdir, absSrc.replace(prefix, '', 1))
   
   if newdst == absSrc:
@@ -80,7 +83,8 @@ def moveFile(src, dst, rmEmptyDirs = True):
   os.rename(src, dst)
   
   oldparent = os.path.dirname(src)
-  if len(os.listdir(oldparent)) <= 0: os.rmdir(oldparent)
+  if len(os.listdir(oldparent)) <= 0:
+    os.rmdir(oldparent)
     
 def symlinkFile(target, link):
   """Symlink link to target."""
@@ -108,7 +112,8 @@ def linkFile(target, link):
     raise OSError("linkFile requires a link path to be specified")
     
   sameFile = os.path.exists(link)
-  if sameFile: sameFile = (os.stat(target).st_ino == os.stat(link).st_ino)
+  if sameFile:
+    sameFile = (os.stat(target).st_ino == os.stat(link).st_ino)
   
   if not sameFile:
     absTarget = os.path.abspath(target)
@@ -120,7 +125,8 @@ def linkFile(target, link):
   
 def isLinkAsNum(path):
   """ Returns 1 if the given path is a symlink, 0 otherwise """
-  if os.path.islink(path): return 1
+  if os.path.islink(path):
+    return 1
   return 0
     
 @contextmanager
@@ -136,12 +142,14 @@ op succeeds or rolled back if it does not.  Can be used with the Python 'with' k
       cursor = connection.cursor()
       yield cursor
     except:
-      if connection != None: connection.rollback()
+      if connection != None:
+        connection.rollback()
       raise
     else:
       connection.commit()
     finally:
-      if cursor != None: cursor.close()
+      if cursor != None:
+        cursor.close()
 
 # Wraps a code block so that if an exception occurs, it is logged
 class ewrap:

@@ -68,7 +68,8 @@ class Sha1FS(Xmp):
   def initDB(self):
     self.sha1db = Sha1DB(self.database)
     
-    if (self.rescan): self.sha1db.updateAllChecksums(self.root)
+    if (self.rescan):
+      self.sha1db.updateAllChecksums(self.root)
 
   def getattr(self, path):
     """

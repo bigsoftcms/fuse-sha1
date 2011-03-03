@@ -60,7 +60,9 @@ and link = 1
 order by chksum, link;""")
         for row in cursor:
           (chksum, path, islink) = row
-          if not chksum in pathmap: pathmap[chksum] = [] # ensure existence of list for checksum
+          if not chksum in pathmap: 
+            # ensure existence of list for checksum
+            pathmap[chksum] = [] 
           paths = pathmap[chksum]
           paths.append(path)
           
@@ -93,7 +95,8 @@ order by chksum, link;""")
         cursor.execute("select path from files;")
         for row in cursor:
           (path, ) = row
-          if not os.path.exists(path): paths.append(path)
+          if not os.path.exists(path):
+            paths.append(path)
           
         for path in paths:
           logging.info("Removing entry for %s; file does not exist" % path)
@@ -186,7 +189,8 @@ order by chksum, link;""")
     
   # Makes sure the SQL statement has a "; at the end"
   def _formatSql(self, sql):
-    if not sql.endswith(";"): sql = sql + ";"
+    if not sql.endswith(";"):
+      sql = sql + ";"
     return sql
 
   # internal method used to run arbitrary SQL on the SQLite database
@@ -196,8 +200,10 @@ order by chksum, link;""")
     
     try:
       with sqliteConn(self.database) as cursor:
-        if sqlargs != None: cursor.execute(sql, sqlargs)
-        else: cursor.execute(sql)
+        if sqlargs != None: 
+          cursor.execute(sql, sqlargs)
+        else:
+          cursor.execute(sql)
     except Exception as einst:
       logging.error("Unable to exec %s with args %s: %s" % (sql, sqlargs, einst))
       raise
@@ -229,14 +235,17 @@ def main():
   
   database = args[0]
   
-  if not os.path.exists(database): parser.error("%s does not exist" % database)
+  if not os.path.exists(database):
+    parser.error("%s does not exist" % database)
     
   sha1db = Sha1DB(database)
   
   # vacuum first, then dedup
-  if options.vacuum: sha1db.vacuum()
+  if options.vacuum:
+    sha1db.vacuum()
   
-  if None != options.dupdir: sha1db.dedup(options.dupdir, options.doSymlink)
+  if None != options.dupdir:
+    sha1db.dedup(options.dupdir, options.doSymlink)
   
 
 if __name__ == '__main__':
