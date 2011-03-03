@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # utility functions for dealing with MD5 hashing
-# Copyright (C) 2009 Chris Bouzek  <bouzekc@gmail.com>
+# Copyright (C) 2009-2011 Chris Bouzek  <bouzekc@gmail.com>
 #
 #
 #    This program can be distributed under the terms of the GNU LGPL.
@@ -9,7 +9,9 @@
 
 import os
 import logging
-from fusesha1util import sha1sum, moveFile, sqliteConn, symlinkFile, isLinkAsNum, linkFile, dstWithSubdirectory
+import hashlib
+from fusesha1util import fileChecksum, moveFile, sqliteConn, symlinkFile
+from fusesha1util import isLinkAsNum, linkFile, dstWithSubdirectory
 
 from optparse import OptionParser
 
@@ -23,11 +25,12 @@ REMOVE_ROW = "delete from files where path = ?;"
     
 class Sha1DB:
   # Creates a new Sha1DB.  If the database given does not exist, it will be created.
-  def __init__(self, database):
+  def __init__(self, database, useMd5=False):
     self.database = database
 
     dbExists = os.path.exists(database)
     
+    usingMd5 = useMd5
     if not dbExists:
       logging.info("Sha1DB initialized with connection string %s" % database)
       self._execSql("""create table if not exists files(
@@ -35,6 +38,17 @@ path varchar not null primary key,
 chksum varchar not null,
 symlink boolean default 0);""")
       self._execSql("create index csum_idx on files(chksum);")
+      self._execSql("create table if not exists versioning(chksum_type varchar not null)");
+      self._execSql("insert into versioning(chksum_type) values(?)", ("md5" if useMd5 else "sha1", ));
+    else:
+      # pull the checksum type out of the database
+      with sqliteConn(self.database) as cursor:
+        cursor.execute("select chksum_type from versioning")
+        for row in cursor:
+          (chksum_type, ) = row
+          usingMd5 = "md5" == chksum_type
+
+    self.checksum = hashlib.md5 if usingMd5 else hashlib.sha1
       
   def dedup(self, dupdir, doSymlink):
     """ Moves duplicate entries (based on checksum) into the dupdir.  Uses the entry's path to 
@@ -152,7 +166,7 @@ order by chksum, link;""")
   # If path is nonexistent, this will log an error
   def _updateChecksumAndLink(self, path, cursor):
     if os.path.exists(path):
-      chksum = sha1sum(path)
+      chksum = fileChecksum(path, self.checksum)
       cursor.execute(CHECKSUM_UPDATE, (path, chksum, isLinkAsNum(path)))
       self._hardlinkDup(path, chksum, cursor)
     else:

@@ -9,7 +9,7 @@
 # Docstring, several other comments, and much general understanding taken from templatefs.py 
 # by Matt Giuca (https://code.launchpad.net/~mgiuca/fuse-python-docs/trunk).
 #
-# Copyright (C) 2009 Chris Bouzek  <bouzekc@gmail.com>
+# Copyright (C) 2009-2011 Chris Bouzek  <bouzekc@gmail.com>
 #
 #
 #    This program can be distributed under the terms of the GNU LGPL.
@@ -38,7 +38,6 @@ from sha1db import Sha1DB
 
 from pysqlite2 import dbapi2 as sqlite
 import logging
-import hashlib
 
 # xmp.py has a number of useful FUSE version checks and other assertions that we rely on here
 
@@ -62,11 +61,12 @@ class Sha1FS(Xmp):
     # Null all the other options so we can correctly handle errors if they are missing
     self.database = None
     self.root = None
+    self.useMd5 = False
     
   # Initializes the database for this class.  If rescan is enabled, this will scan for new/updated files
   # The latter operates on the root filesystem directly here as it is basically a non FUSE operation
   def initDB(self):
-    self.sha1db = Sha1DB(self.database)
+    self.sha1db = Sha1DB(self.database, self.useMd5)
     
     if (self.rescan):
       self.sha1db.updateAllChecksums(self.root)
@@ -516,6 +516,11 @@ Userspace SHA1 checksum FS: mirror the filesystem tree, adding and updating file
                          default = False,
                          help = "(Re)calculate checksums at mount time.")
 
+  server.parser.add_option("--use-md5",
+                         action = "store_true",
+                         dest = "useMd5",
+                         default = False,
+                         help = "Use the (faster) MD5 checksum instead of SHA1.")
 
   server.parse(values=server, errex=1)
   if not server.fuse_args.mountpoint:

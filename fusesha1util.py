@@ -1,12 +1,12 @@
-import hashlib
 # Calculate an SHA1 hex digest for a file
-# Copyright (C) 2009 Chris Bouzek  <bouzekc@gmail.com>
+# Copyright (C) 2009-2011 Chris Bouzek  <bouzekc@gmail.com>
 #
 #
 #    This program can be distributed under the terms of the GNU LGPL.
 #    See the file COPYING.
 #
 
+import hashlib
 import logging
 import os
 
@@ -14,14 +14,18 @@ from contextlib import contextmanager
 from pysqlite2 import dbapi2 as sqlite
 
 LOG_FILENAME = "LOG"
-logging.basicConfig(filename=LOG_FILENAME,level=logging.INFO,)
+logging.basicConfig(filename=LOG_FILENAME,level=logging.WARN,)
 
-def sha1sum(path):
-  '''Returns a SHA1 hash for the file located at the given path.'''
+def fileChecksum(path, checksum_func=hashlib.sha1):
+  '''Returns a hash for the file located at the given path.
+
+    path - The path to the file
+    checksum_func - the checksum function to call.  Defaults to hashlib.sha1.
+  '''
   if None == path:
-    raise IOError("sha1sum requires a path to be specified")
+    raise IOError("fileChecksum requires a path to be specified")
   with open(path, 'rb') as fobj:
-    m = hashlib.sha1()
+    m = checksum_func()
     chunksize = 128 * m.block_size
     while True:
       d = fobj.read(chunksize)

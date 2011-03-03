@@ -1,8 +1,17 @@
+# Calculate an SHA1 hex digest for a file
+# Copyright (C) 2009-2011 Chris Bouzek  <bouzekc@gmail.com>
+#
+#
+#    This program can be distributed under the terms of the GNU LGPL.
+#    See the file COPYING.
+#
+
 import unittest
 import sys
-sys.path.append("../")
 import os
+import hashlib
 
+sys.path.append("../")
 import fusesha1util as fsu
 
 class TestSha1FuseUtil(unittest.TestCase):
@@ -34,11 +43,12 @@ class TestSha1FuseUtil(unittest.TestCase):
 		self.assertEqual("/media/cdrom/subdir/othersubdir/test.txt",
 			fsu.dstWithSubdirectory("/media/cdrom/othersubdir/test.txt", "/media/cdrom/subdir"))
 	
-	# Test the variations on sha1sum
-	def testSha1Sum(self):
-		self.assertRaises(IOError, lambda: fsu.sha1sum(""))
-		self.assertRaises(IOError, lambda: fsu.sha1sum(None))
-		self.assertEqual("9519b846c2b3a933bd348cc983f3796180ad2761", fsu.sha1sum(self._sha1file))
+	# Test the variations on fileChecksum
+	def testFileChecksum(self):
+		self.assertRaises(IOError, lambda: fsu.fileChecksum(""))
+		self.assertRaises(IOError, lambda: fsu.fileChecksum(None))
+		self.assertEqual("9519b846c2b3a933bd348cc983f3796180ad2761", fsu.fileChecksum(self._sha1file))
+		self.assertEqual("5af12c8f98e305b8ecfd91a4d5d0a302", fsu.fileChecksum(self._sha1file, hashlib.md5))
 		
 	def testLinkFileBad(self):
 		self.assertRaises(OSError, lambda: fsu.linkFile(None, None))
