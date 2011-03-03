@@ -21,10 +21,8 @@ def sha1sum(path):
   if None == path:
     raise IOError("sha1sum requires a path to be specified")
   with open(path, 'rb') as fobj:
-    kb = 1024
-    chunksize = 100 * kb
-  
     m = hashlib.sha1()
+    chunksize = 128 * m.block_size
     while True:
       d = fobj.read(chunksize)
       if not d:
