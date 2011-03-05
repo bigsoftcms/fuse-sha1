@@ -4,7 +4,7 @@ in xmp.py).
 If you did not receive these files from github.com/chrisbnw/fuse-sha1, you may have an old,
 corrupted, or malicious version of the software.
 
-Any questions please contact Chris Bouzek (bouzekc@gmail.com).
+Any questions please contact Chris Bouzek (nwchrisb at google's quality mail service).
 
 fuse-sha1 (and xmp) works by mounting a directory as the "root" filesystem for the mirror, then
 applying SHA1 checksums to an SQLite database whenever a file is removed, updated, or added.
